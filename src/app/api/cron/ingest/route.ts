@@ -9,6 +9,12 @@ import { isStale, matchClustersToEvents, type ExistingEventRef } from "@/lib/mat
 import { isSpain, reverseGeocode } from "@/lib/geocode";
 
 export const dynamic = "force-dynamic";
+// Default Vercel function timeout (10s on Hobby) isn't enough once there
+// are more than ~8 brand-new clusters to geocode in a single run — each one
+// costs ~1s from Nominatim's rate limit alone. 60s is the max Hobby allows;
+// if a run someday needs to geocode more than ~50 new clusters this will
+// still time out and need a real fix (e.g. capping geocodes per run).
+export const maxDuration = 60;
 
 function isAuthorized(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
