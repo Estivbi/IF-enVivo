@@ -375,49 +375,63 @@ export function FiresMap({
       aria-label="Mapa de incendios forestales en España"
     >
       <div ref={containerRef} className="h-full w-full" />
-      <div
-        className="absolute bottom-6 left-2 z-10 flex overflow-hidden rounded border border-gray-700 text-xs shadow"
-        role="group"
-        aria-label="Tipo de mapa base"
-      >
-        <button
-          onClick={() => switchBasemap("streets")}
-          aria-pressed={basemap === "streets"}
-          aria-label="Vista de calle"
-          className={`px-2 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500 ${basemap === "streets" ? "bg-gray-800 text-white" : "bg-white text-gray-700"}`}
+
+      {/* ── Controles del mapa ─────────────────────────────────────────────
+           Móvil: esquina superior derecha (top-2 right-2) para no solapar
+           ni con el hamburguesa (top-2 left-2) ni con la barra del navegador.
+           Desktop: abajo a la izquierda, igual que antes.
+          ──────────────────────────────────────────────────────────────── */}
+      <div className="absolute right-2 top-2 z-10 flex flex-col items-end gap-1 sm:bottom-6 sm:left-2 sm:right-auto sm:top-auto sm:items-start">
+
+        {/* Toggle basemap: Calle / Satélite */}
+        <div
+          className="flex overflow-hidden rounded border border-gray-600 text-xs shadow"
+          role="group"
+          aria-label="Tipo de mapa base"
         >
-          Calle
-        </button>
-        <button
-          onClick={() => switchBasemap("satellite")}
-          aria-pressed={basemap === "satellite"}
-          aria-label="Vista satélite"
-          className={`px-2 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500 ${basemap === "satellite" ? "bg-gray-800 text-white" : "bg-white text-gray-700"}`}
-        >
-          Satélite
-        </button>
-      </div>
-      <div
-        className="absolute bottom-16 left-2 z-10 flex flex-col gap-1 rounded border border-gray-700 bg-gray-800/90 p-1.5 text-xs shadow"
-        role="group"
-        aria-label="Capas de visión adicionales"
-      >
-        {OVERLAYS.map((overlay) => {
-          const isOn = activeOverlays.has(overlay.id);
-          return (
-            <button
-              key={overlay.id}
-              onClick={() => toggleOverlay(overlay)}
-              aria-pressed={isOn}
-              title={overlay.title}
-              className={`cursor-help rounded px-2 py-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500 ${
-                isOn ? "bg-orange-600 text-white" : "text-gray-300 hover:bg-gray-700"
-              }`}
-            >
-              {overlay.label}
-            </button>
-          );
-        })}
+          <button
+            onClick={() => switchBasemap("streets")}
+            aria-pressed={basemap === "streets"}
+            aria-label="Vista de calle"
+            className={`px-2 py-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500 ${
+              basemap === "streets" ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-700"
+            }`}
+          >
+            Calle
+          </button>
+          <button
+            onClick={() => switchBasemap("satellite")}
+            aria-pressed={basemap === "satellite"}
+            aria-label="Vista satélite"
+            className={`px-2 py-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500 ${
+              basemap === "satellite" ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-700"
+            }`}
+          >
+            Satélite
+          </button>
+        </div>
+
+        {/* Overlays colapsables — en móvil se expanden hacia abajo, en desktop hacia arriba */}
+        <div className="flex flex-col items-end gap-1 sm:items-start">
+          {OVERLAYS.map((overlay) => {
+            const isOn = activeOverlays.has(overlay.id);
+            return (
+              <button
+                key={overlay.id}
+                onClick={() => toggleOverlay(overlay)}
+                aria-pressed={isOn}
+                title={overlay.title}
+                className={`max-w-[9rem] rounded border px-2 py-1 text-left text-xs shadow focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500 ${
+                  isOn
+                    ? "border-orange-500 bg-orange-600 text-white"
+                    : "border-gray-600 bg-gray-800/90 text-gray-300 hover:bg-gray-700"
+                }`}
+              >
+                {overlay.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
