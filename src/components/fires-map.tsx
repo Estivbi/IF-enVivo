@@ -54,6 +54,39 @@ const SATELLITE_STYLE: StyleSpecification = {
 
 type Basemap = "streets" | "satellite";
 
+// Extra vision layers — additive overlays, independent of the Calle/Satélite
+// basemap choice and of each other. All verified reachable with curl before
+// wiring them in (GIBS's own hotspot layer taught us not to trust "official
+// free API" claims at face value).
+function gibsTrueColorUrl(): string {
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_CorrectedReflectance_TrueColor/default/${yesterday}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`;
+}
+
+// EUMETSAT WMS — omitting TIME entirely uses the server's own "default"
+// (nearestValue="1" in its capabilities), which tracks its latest available
+// pass, so this stays current without us computing a timestamp ourselves.
+function eumetsatWmsUrl(layer: string): string {
+  return `https://view.eumetsat.int/geoserver/ows?service=WMS&version=1.3.0&request=GetMap&layers=${layer}&bbox={bbox-epsg-3857}&width=256&height=256&crs=EPSG:3857&format=image/png&transparent=true`;
+}
+
+type OverlayId = "gibs" | "eumetsat-msg" | "eumetsat-mtg";
+const OVERLAYS: { id: OverlayId; label: string; sourceId: string; layerId: string }[] = [
+  { id: "gibs", label: "Imagen NASA", sourceId: "overlay-gibs", layerId: "overlay-gibs-layer" },
+  {
+    id: "eumetsat-msg",
+    label: "Focos EUMETSAT",
+    sourceId: "overlay-eumetsat-msg",
+    layerId: "overlay-eumetsat-msg-layer",
+  },
+  {
+    id: "eumetsat-mtg",
+    label: "Temp. fuego EUMETSAT",
+    sourceId: "overlay-eumetsat-mtg",
+    layerId: "overlay-eumetsat-mtg-layer",
+  },
+];
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -74,6 +107,11 @@ export function FiresMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const [basemap, setBasemap] = useState<Basemap>("streets");
+  const [activeOverlays, setActiveOverlays] = useState<Set<OverlayId>>(new Set());
+  // Read inside style.load (fires again on every basemap switch) so an
+  // overlay a user turned on stays on across a Calle/Satélite swap.
+  const activeOverlaysRef = useRef(activeOverlays);
+  activeOverlaysRef.current = activeOverlays;
 
   // 'style.load' fires asynchronously (and again on every setStyle() call),
   // which can resolve after the /api/fires fetch already updated `fires` —
@@ -101,6 +139,53 @@ export function FiresMap({
     // (basemap switch) — re-adding our sources/layers here keeps them alive
     // across a full basemap swap instead of only on first mount.
     map.on("style.load", () => {
+      // Additive vision overlays (GIBS true-color, EUMETSAT) — added first so
+      // they sit below our own markers/points/perimeter, never covering them.
+      // Off by default; visibility is restored from the ref so a toggle a
+      // user already made survives a basemap switch.
+      map.addSource("overlay-gibs", {
+        type: "raster",
+        tiles: [gibsTrueColorUrl()],
+        tileSize: 256,
+        maxzoom: 9,
+        attribution: "NASA GIBS / VIIRS",
+      });
+      map.addLayer({
+        id: "overlay-gibs-layer",
+        type: "raster",
+        source: "overlay-gibs",
+        layout: { visibility: activeOverlaysRef.current.has("gibs") ? "visible" : "none" },
+        paint: { "raster-opacity": 0.85 },
+      });
+
+      map.addSource("overlay-eumetsat-msg", {
+        type: "raster",
+        tiles: [eumetsatWmsUrl("msg_fes:fire")],
+        tileSize: 256,
+        attribution: "EUMETSAT",
+      });
+      map.addLayer({
+        id: "overlay-eumetsat-msg-layer",
+        type: "raster",
+        source: "overlay-eumetsat-msg",
+        layout: { visibility: activeOverlaysRef.current.has("eumetsat-msg") ? "visible" : "none" },
+        paint: { "raster-opacity": 0.85 },
+      });
+
+      map.addSource("overlay-eumetsat-mtg", {
+        type: "raster",
+        tiles: [eumetsatWmsUrl("mtg_fd:rgb_firetemperature")],
+        tileSize: 256,
+        attribution: "EUMETSAT",
+      });
+      map.addLayer({
+        id: "overlay-eumetsat-mtg-layer",
+        type: "raster",
+        source: "overlay-eumetsat-mtg",
+        layout: { visibility: activeOverlaysRef.current.has("eumetsat-mtg") ? "visible" : "none" },
+        paint: { "raster-opacity": 0.85 },
+      });
+
       // Raw hotspot "cloud" for the selected fire, from /api/fires/:id/points.
       // Originally tried NASA GIBS's own hotspot overlay for this but it
       // 404s on literally every tile/date I throw at it (checked with curl,
@@ -253,6 +338,21 @@ export function FiresMap({
     map.setStyle(next === "streets" ? STREETS_STYLE : SATELLITE_STYLE);
   }
 
+  function toggleOverlay(overlay: (typeof OVERLAYS)[number]) {
+    const map = mapRef.current;
+    if (!map) return;
+    setActiveOverlays((prev) => {
+      const next = new Set(prev);
+      const willBeVisible = !next.has(overlay.id);
+      if (willBeVisible) next.add(overlay.id);
+      else next.delete(overlay.id);
+      if (map.getLayer(overlay.layerId)) {
+        map.setLayoutProperty(overlay.layerId, "visibility", willBeVisible ? "visible" : "none");
+      }
+      return next;
+    });
+  }
+
   return (
     <div
       className="relative h-full w-full"
@@ -281,6 +381,27 @@ export function FiresMap({
         >
           Satélite
         </button>
+      </div>
+      <div
+        className="absolute bottom-16 left-2 z-10 flex flex-col gap-1 rounded border border-gray-700 bg-gray-800/90 p-1.5 text-xs shadow"
+        role="group"
+        aria-label="Capas de visión adicionales"
+      >
+        {OVERLAYS.map((overlay) => {
+          const isOn = activeOverlays.has(overlay.id);
+          return (
+            <button
+              key={overlay.id}
+              onClick={() => toggleOverlay(overlay)}
+              aria-pressed={isOn}
+              className={`rounded px-2 py-1 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500 ${
+                isOn ? "bg-orange-600 text-white" : "text-gray-300 hover:bg-gray-700"
+              }`}
+            >
+              {overlay.label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
