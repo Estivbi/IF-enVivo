@@ -11,7 +11,7 @@ jobs:
     steps:
       - name: Trigger /api/cron/ingest
         run: |
-          status=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
+          status=$(curl -sL -o /tmp/response.txt -w "%{http_code}" \
             -X GET "${{ secrets.INGEST_URL }}" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
           cat /tmp/response.txt
