@@ -108,7 +108,15 @@ export function Sidebar({
       className="flex h-full w-full flex-col overflow-y-auto bg-gray-800 md:w-80 md:shrink-0 md:border-r md:border-gray-700"
     >
       <header className="border-b border-gray-700 p-4">
-        <h1 className="text-lg font-semibold text-white">FOCOS</h1>
+        <div className="flex items-center gap-2">
+          <img
+            src="/focosif-svg.svg"
+            alt=""
+            aria-hidden="true"
+            className="h-8 w-8"
+          />
+          <h1 className="text-lg font-semibold text-white">FOCOS</h1>
+        </div>
         <LiveClock />
         {/* Aviso de retraso visible siempre, incluso en móvil sin sidebar expandida */}
         <p className="mt-2 text-xs text-gray-300">
