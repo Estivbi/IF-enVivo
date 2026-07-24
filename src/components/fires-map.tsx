@@ -20,6 +20,14 @@ const LEVEL_COLOR: Record<number, string> = {
 
 const EMPTY_POINTS: HotspotPointCollection = { type: "FeatureCollection", features: [] };
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 export function FiresMap({
   fires,
   selectedId,
@@ -98,11 +106,18 @@ export function FiresMap({
         map.getCanvas().style.cursor = "pointer";
         const feature = e.features?.[0];
         if (!feature) return;
-        const props = feature.properties as { name?: string; desc?: string };
+        const props = feature.properties as {
+          name?: string;
+          desc?: string;
+          municipality?: string;
+          province?: string;
+        };
+        const searchQuery = `112 incendio ${[props.municipality, props.province].filter(Boolean).join(" ")}`.trim();
+        const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`;
         popup
           .setLngLat((feature.geometry as GeoJSON.Point).coordinates as [number, number])
           .setHTML(
-            `<strong>${props.name ?? "Incendio sin nombre"}</strong><br/>${props.desc ?? ""}<br/><em>Nivel estimado, no oficial</em>`,
+            `<strong>${escapeHtml(props.name ?? "Incendio sin nombre")}</strong><br/>${escapeHtml(props.desc ?? "")}<br/><em>Nivel estimado, no oficial</em><br/><a href="${searchUrl}" target="_blank" rel="noopener noreferrer">Buscar información oficial ↗</a>`,
           )
           .addTo(map);
       });

@@ -8,6 +8,14 @@ const LEVEL_LABEL: Record<number, string> = {
   2: "En crecimiento",
 };
 
+// Reference link only — no scraping, no copied content. Lets the user check
+// official sources (112/Protección Civil) themselves; see ADR-0003.
+function officialInfoSearchUrl(municipality: string | null, province: string | null): string {
+  const place = [municipality, province].filter(Boolean).join(" ");
+  const query = `112 incendio ${place}`.trim();
+  return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+}
+
 export function Sidebar({
   fires,
   selectedId,
@@ -38,12 +46,13 @@ export function Sidebar({
           </li>
         )}
         {sorted.map((f) => (
-          <li key={f.properties.id}>
+          <li
+            key={f.properties.id}
+            className={selectedId === f.properties.id ? "bg-gray-700" : ""}
+          >
             <button
               onClick={() => onSelect(f.properties.id)}
-              className={`w-full px-4 py-3 text-left transition hover:bg-gray-700 ${
-                selectedId === f.properties.id ? "bg-gray-700" : ""
-              }`}
+              className="w-full px-4 pt-3 text-left transition hover:bg-gray-700"
             >
               <div className="flex items-center justify-between">
                 <span className="font-medium text-gray-100">
@@ -63,6 +72,15 @@ export function Sidebar({
               </div>
               <p className="mt-1 text-xs text-gray-400">{f.properties.desc}</p>
             </button>
+            <a
+              href={officialInfoSearchUrl(f.properties.municipality, f.properties.province)}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="mb-3 ml-4 mt-1 inline-block text-xs text-orange-300 hover:text-orange-200 hover:underline"
+            >
+              Buscar información oficial ↗
+            </a>
           </li>
         ))}
       </ul>
