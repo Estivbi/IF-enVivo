@@ -116,7 +116,7 @@ export function FiresMap({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
-  const [basemap, setBasemap] = useState<Basemap>("streets");
+  const [basemap, setBasemap] = useState<Basemap>("satellite");
   const [activeOverlays, setActiveOverlays] = useState<Set<OverlayId>>(new Set());
   // Read inside style.load (fires again on every basemap switch) so an
   // overlay a user turned on stays on across a Calle/Satélite swap.
@@ -138,7 +138,7 @@ export function FiresMap({
 
     const map = new MapLibreMap({
       container: containerRef.current,
-      style: STREETS_STYLE,
+      style: SATELLITE_STYLE,
       center: SPAIN_CENTER,
       zoom: 5.5,
     });
