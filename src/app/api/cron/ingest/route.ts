@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { fireEvents, hotspotPoints } from "@/db/schema";
 import { fetchFirmsHotspots, isLowConfidence } from "@/lib/firms";
@@ -10,7 +10,7 @@ import {
   matchClustersToEvents,
   type ExistingEventRef,
 } from "@/lib/matching";
-import { reverseGeocode } from "@/lib/geocode";
+import { isSpain, reverseGeocode } from "@/lib/geocode";
 
 export const dynamic = "force-dynamic";
 
@@ -20,39 +20,55 @@ function isAuthorized(req: NextRequest): boolean {
   return req.headers.get("authorization") === `Bearer ${secret}`;
 }
 
-async function upsertCluster(
+async function updateExistingEvent(
+  eventId: string,
   cluster: ClusterSummary,
-  matchedEventId: string | null,
   previousPointCount: number | undefined,
-): Promise<string> {
-  const level = computeLevel(cluster, previousPointCount);
+): Promise<void> {
+  await db
+    .update(fireEvents)
+    .set({
+      centroidLat: cluster.centroidLat,
+      centroidLon: cluster.centroidLon,
+      status: "active",
+      level: computeLevel(cluster, previousPointCount),
+      pointCount: cluster.pointCount,
+      maxFrp: cluster.maxFrp,
+      sumFrp: cluster.sumFrp,
+      estHectares: cluster.estHectares,
+      lastDetectedAt: cluster.lastSeen,
+      updatedAt: new Date(),
+    })
+    .where(eq(fireEvents.id, eventId));
+}
 
-  if (matchedEventId) {
-    await db
-      .update(fireEvents)
-      .set({
-        centroidLat: cluster.centroidLat,
-        centroidLon: cluster.centroidLon,
-        status: "active",
-        level,
-        pointCount: cluster.pointCount,
-        maxFrp: cluster.maxFrp,
-        sumFrp: cluster.sumFrp,
-        estHectares: cluster.estHectares,
-        lastDetectedAt: cluster.lastSeen,
-        updatedAt: new Date(),
-      })
-      .where(eq(fireEvents.id, matchedEventId));
-    return matchedEventId;
+/**
+ * The FIRMS bbox (PROMPT_INICIAL.md §3.1) also catches northern Algeria and
+ * Morocco. Geocode a brand-new cluster up front and only create a
+ * fire_event if it's actually in Spain — otherwise skip it entirely.
+ */
+async function createEventIfSpain(
+  cluster: ClusterSummary,
+  nominatimUserAgent: string | undefined,
+): Promise<{ eventId: string | null; skippedOutsideSpain: boolean }> {
+  const place = nominatimUserAgent
+    ? await reverseGeocode(cluster.centroidLat, cluster.centroidLon, nominatimUserAgent)
+    : null;
+
+  if (place && !isSpain(place)) {
+    return { eventId: null, skippedOutsideSpain: true };
   }
 
   const [inserted] = await db
     .insert(fireEvents)
     .values({
+      name: place?.name ?? null,
+      municipality: place?.municipality ?? null,
+      province: place?.province ?? null,
       centroidLat: cluster.centroidLat,
       centroidLon: cluster.centroidLon,
       status: "active",
-      level,
+      level: computeLevel(cluster, undefined),
       pointCount: cluster.pointCount,
       maxFrp: cluster.maxFrp,
       sumFrp: cluster.sumFrp,
@@ -62,7 +78,7 @@ async function upsertCluster(
     })
     .returning({ id: fireEvents.id });
 
-  return inserted.id;
+  return { eventId: inserted.id, skippedOutsideSpain: false };
 }
 
 async function insertNewPoints(
@@ -143,50 +159,27 @@ async function runIngest(req: NextRequest) {
     matches.map((m) => m.matchedEventId).filter((id): id is string => !!id),
   );
 
-  const touchedEventIds: string[] = [];
+  let created = 0;
+  let skippedOutsideSpain = 0;
   for (const match of matches) {
-    const previous = activeEvents.find((e) => e.id === match.matchedEventId);
-    const eventId = await upsertCluster(
-      match.cluster,
-      match.matchedEventId,
-      previous?.pointCount,
-    );
-    await insertNewPoints(
-      eventId,
-      match.cluster,
-      previous?.lastDetectedAt ?? null,
-    );
-    touchedEventIds.push(eventId);
-  }
+    if (match.matchedEventId) {
+      const previous = activeEvents.find((e) => e.id === match.matchedEventId);
+      await updateExistingEvent(match.matchedEventId, match.cluster, previous?.pointCount);
+      await insertNewPoints(match.matchedEventId, match.cluster, previous?.lastDetectedAt ?? null);
+      continue;
+    }
 
-  // Lazy reverse geocoding — only events that still have no name, throttled
-  // to 1 req/sec inside reverseGeocode() per Nominatim's usage policy.
-  let geocoded = 0;
-  if (nominatimUserAgent && touchedEventIds.length > 0) {
-    const unnamed = await db
-      .select({
-        id: fireEvents.id,
-        centroidLat: fireEvents.centroidLat,
-        centroidLon: fireEvents.centroidLon,
-      })
-      .from(fireEvents)
-      .where(and(isNull(fireEvents.name), eq(fireEvents.status, "active")));
-
-    for (const event of unnamed) {
-      const place = await reverseGeocode(
-        event.centroidLat,
-        event.centroidLon,
-        nominatimUserAgent,
-      );
-      await db
-        .update(fireEvents)
-        .set({
-          name: place.name,
-          municipality: place.municipality,
-          province: place.province,
-        })
-        .where(eq(fireEvents.id, event.id));
-      geocoded++;
+    const { eventId, skippedOutsideSpain: skipped } = await createEventIfSpain(
+      match.cluster,
+      nominatimUserAgent,
+    );
+    if (skipped) {
+      skippedOutsideSpain++;
+      continue;
+    }
+    if (eventId) {
+      created++;
+      await insertNewPoints(eventId, match.cluster, null);
     }
   }
 
@@ -208,8 +201,8 @@ async function runIngest(req: NextRequest) {
     hotspotsAfterConfidenceFilter: filtered.length,
     clustersDetected: clusters.length,
     eventsUpdated: matches.filter((m) => m.matchedEventId).length,
-    eventsCreated: matches.filter((m) => !m.matchedEventId).length,
+    eventsCreated: created,
+    eventsSkippedOutsideSpain: skippedOutsideSpain,
     eventsClosed: closed,
-    eventsGeocoded: geocoded,
   });
 }

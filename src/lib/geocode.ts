@@ -17,12 +17,14 @@ type NominatimAddress = {
   municipality?: string;
   province?: string;
   state?: string;
+  country_code?: string;
 };
 
 export type GeocodedPlace = {
   name: string;
   municipality: string | null;
   province: string | null;
+  countryCode: string | null;
 };
 
 /**
@@ -61,5 +63,16 @@ export async function reverseGeocode(
         ? `Incendio de ${municipality}`
         : "Incendio sin municipio identificado";
 
-  return { name, municipality, province };
+  return {
+    name,
+    municipality,
+    province,
+    countryCode: address.country_code ?? null,
+  };
+}
+
+// The FIRMS bbox (PROMPT_INICIAL.md §3.1) also catches northern Algeria and
+// Morocco — filter to Spain only once we know the country from geocoding.
+export function isSpain(place: GeocodedPlace): boolean {
+  return place.countryCode === "es";
 }
