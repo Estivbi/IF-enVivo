@@ -21,10 +21,9 @@ const STATUS_COLOR: Record<string, string> = {
 const EMPTY_POINTS: HotspotPointCollection = { type: "FeatureCollection", features: [] };
 
 const STREETS_STYLE = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
-// Esri World Imagery — free, no API key, no usage cap for this kind of
-// low-volume public app. Kept as a plain style object (no external style.json
-// fetch needed) so switching basemaps can't hit the same kind of external
-// service issue the GIBS vector layer did.
+// Esri World Imagery — free, no key, plenty for how little traffic this
+// gets. Wrote it as a plain style object instead of pointing at a
+// style.json URL so there's one less external fetch that could go down.
 const SATELLITE_STYLE: StyleSpecification = {
   version: 8,
   sources: {
@@ -101,11 +100,11 @@ export function FiresMap({
     // (basemap switch) — re-adding our sources/layers here keeps them alive
     // across a full basemap swap instead of only on first mount.
     map.on("style.load", () => {
-      // Raw hotspot "cloud" for the selected fire — populated lazily from
-      // /api/fires/:id/points. NASA GIBS's own vector-tile hotspot layer
-      // returns 404 on every tile/date tested as of this writing, so this
-      // uses our own already-ingested points instead of that external
-      // service.
+      // Raw hotspot "cloud" for the selected fire, from /api/fires/:id/points.
+      // Originally tried NASA GIBS's own hotspot overlay for this but it
+      // 404s on literally every tile/date I throw at it (checked with curl,
+      // not just in the browser) — probably down on their end. Using our
+      // own already-ingested points instead works just as well anyway.
       map.addSource("hotspot-points", {
         type: "geojson",
         data: hotspotPointsRef.current as unknown as GeoJSON.FeatureCollection,

@@ -1,5 +1,8 @@
 import { haversineKm, type ClusterSummary } from "./clustering";
 
+// 5km gives some slack for the centroid to drift a bit between runs
+// without losing the fire's identity — much bigger than that and we'd risk
+// merging two genuinely separate fires that just happen to be close.
 export const MATCH_RADIUS_KM = 5;
 export const INACTIVE_AFTER_HOURS = 24;
 

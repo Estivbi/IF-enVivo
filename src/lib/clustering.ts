@@ -182,6 +182,9 @@ export function summarizeCluster(points: ClusterPoint[]): ClusterSummary {
   };
 }
 
+// eps=2.5km / min_samples=3 come straight from the spec doc. Haven't had
+// a real reason to retune these yet — leaving as-is until FIRMS data shows
+// otherwise.
 export const DEFAULT_EPS_KM = 2.5;
 export const DEFAULT_MIN_SAMPLES = 3;
 

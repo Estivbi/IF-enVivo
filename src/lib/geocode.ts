@@ -1,4 +1,6 @@
-const NOMINATIM_MIN_INTERVAL_MS = 1000; // Nominatim usage policy: max 1 req/sec
+// Nominatim's usage policy caps this at 1 req/sec — go faster and they'll
+// just ban the IP, which would break reverse geocoding for everyone.
+const NOMINATIM_MIN_INTERVAL_MS = 1000;
 let lastRequestAt = 0;
 
 async function throttle(): Promise<void> {

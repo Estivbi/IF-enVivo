@@ -31,6 +31,8 @@ export function Dashboard() {
     return () => clearInterval(interval);
   }, [load]);
 
+  // Closing the drawer on select too, otherwise picking a fire from the
+  // list on a phone leaves the sidebar covering the map you just asked to see.
   function handleSelect(id: string) {
     setSelectedId(id);
     setSidebarOpen(false);
@@ -44,6 +46,8 @@ export function Dashboard() {
           onClick={() => setSidebarOpen(false)}
         />
       )}
+      {/* Below md this is an overlay drawer (hidden by default); md+ it's
+          just a normal static sidebar and sidebarOpen stops mattering. */}
       <div
         className={`fixed inset-y-0 left-0 z-30 w-80 max-w-full transition-transform duration-200 md:static md:z-auto md:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
