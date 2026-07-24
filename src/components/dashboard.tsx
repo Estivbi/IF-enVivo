@@ -53,19 +53,20 @@ export function Dashboard() {
 
   return (
     <div className="relative flex h-screen w-screen overflow-hidden">
-      {/* Overlay semitransparente en móvil cuando el sidebar está abierto */}
+      {/* Overlay semitransparente en móvil/tablet cuando el sidebar está abierto */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-20 bg-black/50 md:hidden"
+          className="fixed inset-0 z-20 bg-black/50 lg:hidden"
           onClick={() => setSidebarOpen(false)}
           aria-hidden="true"
         />
       )}
 
-      {/* Below md this is an overlay drawer (hidden by default); md+ it's
-          just a normal static sidebar and sidebarOpen stops mattering. */}
+      {/* Below lg (phone + tablet) this is an overlay drawer (hidden by
+          default); lg+ (desktop) it's a normal static sidebar and
+          sidebarOpen stops mattering. */}
       <div
-        className={`fixed inset-y-0 left-0 z-30 w-80 max-w-full transition-transform duration-200 md:static md:z-auto md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-30 w-80 max-w-full transition-transform duration-200 lg:static lg:z-auto lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
         aria-hidden={!sidebarOpen}
@@ -74,13 +75,13 @@ export function Dashboard() {
       </div>
 
       <main id="main-content" className="relative flex-1">
-        {/* Botón hamburguesa para móvil — SVG en lugar de caracter Unicode */}
+        {/* Botón hamburguesa para móvil/tablet — SVG en lugar de caracter Unicode */}
         <button
           onClick={() => setSidebarOpen(true)}
           aria-label="Abrir lista de incendios"
           aria-expanded={sidebarOpen}
           aria-controls="sidebar-nav"
-          className="absolute left-2 top-2 z-10 rounded bg-gray-800 px-3 py-2 text-white shadow md:hidden"
+          className="absolute left-2 top-2 z-10 rounded bg-gray-800 px-3 py-2 text-white shadow lg:hidden"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"

@@ -105,7 +105,7 @@ export function Sidebar({
     <aside
       id="sidebar-nav"
       aria-label="Panel de incendios detectados"
-      className="flex h-full w-full flex-col overflow-y-auto bg-gray-800 md:w-80 md:shrink-0 md:border-r md:border-gray-700"
+      className="flex h-full w-full flex-col overflow-y-auto bg-gray-800 lg:w-80 lg:shrink-0 lg:border-r lg:border-gray-700"
     >
       <header className="border-b border-gray-700 p-4">
         <div className="flex items-center gap-2">

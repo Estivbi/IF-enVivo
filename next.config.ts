@@ -8,8 +8,9 @@ const ContentSecurityPolicy = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
-  // Carto streets basemap + tiles; ESRI satellite tiles.
-  "connect-src 'self' https://basemaps.cartocdn.com https://*.cartocdn.com https://server.arcgisonline.com",
+  // Carto streets basemap + tiles; ESRI satellite tiles; NASA GIBS true-color
+  // imagery; EUMETSAT WMS fire overlays.
+  "connect-src 'self' https://basemaps.cartocdn.com https://*.cartocdn.com https://server.arcgisonline.com https://gibs.earthdata.nasa.gov https://view.eumetsat.int",
   // MapLibre GL creates web workers from blob: URLs.
   "worker-src blob:",
   "frame-ancestors 'none'",
