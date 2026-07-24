@@ -8,7 +8,7 @@ import {
   type GeoJSONSource,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import type { FireEventCollection } from "@/lib/types";
+import type { FireEventCollection, HotspotPointCollection } from "@/lib/types";
 
 const SPAIN_CENTER: [number, number] = [-3.7, 40.2];
 
@@ -18,21 +18,7 @@ const LEVEL_COLOR: Record<number, string> = {
   2: "#dc2626", // red
 };
 
-const GIBS_LAYER = "VIIRS_SNPP_Thermal_Anomalies_375m_All";
-// GIBS retired the raster PNG hotspot layer — it now only ships this as
-// vector tiles (.mvt), matrix set/source-layer per its own published style:
-// https://gibs.earthdata.nasa.gov/vector-styles/v1.0/FIRMS_VIIRS_Thermal_Anomalies.json
-const GIBS_SOURCE_LAYER = `${GIBS_LAYER}_v1_NRT`;
-
-function gibsFireTileUrl(): string {
-  // NRT imagery for "today" isn't published yet (its own processing lag, on
-  // top of the 1-3h satellite delay) — request yesterday, the most recent
-  // day reliably available.
-  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
-    .toISOString()
-    .slice(0, 10);
-  return `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${GIBS_LAYER}/default/${yesterday}/GoogleMapsCompatible_Level8/{z}/{y}/{x}.mvt`;
-}
+const EMPTY_POINTS: HotspotPointCollection = { type: "FeatureCollection", features: [] };
 
 export function FiresMap({
   fires,
@@ -43,6 +29,13 @@ export function FiresMap({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
+  // 'load' fires asynchronously (style/sprite/glyphs), which can resolve
+  // after the /api/fires fetch already updated `fires` — read this ref
+  // instead of the closure-captured prop so 'load' always sees the latest
+  // data instead of locking in whatever `fires` was at mount time (likely
+  // still empty).
+  const firesRef = useRef(fires);
+  firesRef.current = fires;
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -57,27 +50,29 @@ export function FiresMap({
     map.addControl(new NavigationControl(), "top-right");
 
     map.on("load", () => {
-      map.addSource("gibs-heat", {
-        type: "vector",
-        tiles: [gibsFireTileUrl()],
-        maxzoom: 8,
-        attribution: "NASA GIBS / VIIRS",
+      // Raw hotspot "cloud" for the selected fire — populated lazily from
+      // /api/fires/:id/points (see the selectedId effect below). NASA GIBS's
+      // own vector-tile hotspot layer returns 404 on every tile/date tested
+      // as of this writing, so this uses our own already-ingested points
+      // instead of that external service.
+      map.addSource("hotspot-points", {
+        type: "geojson",
+        data: EMPTY_POINTS as unknown as GeoJSON.FeatureCollection,
       });
       map.addLayer({
-        id: "gibs-heat-layer",
+        id: "hotspot-points-circles",
         type: "circle",
-        source: "gibs-heat",
-        "source-layer": GIBS_SOURCE_LAYER,
+        source: "hotspot-points",
         paint: {
-          "circle-radius": ["step", ["zoom"], 1, 5, 2, 8, 3],
-          "circle-color": "rgb(240, 40, 40)",
-          "circle-opacity": 0.65,
+          "circle-radius": 4,
+          "circle-color": "#dc2626",
+          "circle-opacity": 0.5,
         },
       });
 
       map.addSource("fire-events", {
         type: "geojson",
-        data: fires as unknown as GeoJSON.FeatureCollection,
+        data: firesRef.current as unknown as GeoJSON.FeatureCollection,
       });
       map.addLayer({
         id: "fire-events-circles",
@@ -121,7 +116,6 @@ export function FiresMap({
       map.remove();
       mapRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -137,6 +131,19 @@ export function FiresMap({
     const feature = fires.features.find((f) => f.properties.id === selectedId);
     if (!feature) return;
     map.flyTo({ center: feature.geometry.coordinates, zoom: 10 });
+
+    let cancelled = false;
+    fetch(`/api/fires/${selectedId}/points`)
+      .then((res) => (res.ok ? (res.json() as Promise<HotspotPointCollection>) : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        const source = map.getSource("hotspot-points") as GeoJSONSource | undefined;
+        source?.setData(data as unknown as GeoJSON.FeatureCollection);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [selectedId, fires]);
 
   return <div ref={containerRef} className="h-full w-full" />;

@@ -26,3 +26,22 @@ export type FireEventCollection = {
   type: "FeatureCollection";
   features: FireEventFeature[];
 };
+
+export type HotspotPointProperties = {
+  id: number;
+  acqAt: string;
+  frp: number | null;
+  confidence: string | null;
+  satellite: string | null;
+};
+
+export type HotspotPointFeature = {
+  type: "Feature";
+  geometry: { type: "Point"; coordinates: [number, number] };
+  properties: HotspotPointProperties;
+};
+
+export type HotspotPointCollection = {
+  type: "FeatureCollection";
+  features: HotspotPointFeature[];
+};

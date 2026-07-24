@@ -20,19 +20,20 @@ export function Sidebar({
   const sorted = [...fires.features].sort((a, b) => b.properties.level - a.properties.level);
 
   return (
-    <aside className="flex h-full w-80 shrink-0 flex-col overflow-y-auto border-r border-gray-200 bg-white">
-      <div className="border-b border-gray-200 p-4">
-        <h1 className="text-lg font-semibold">FOCOS</h1>
-        <p className="mt-1 text-xs text-gray-500">
+    <aside className="flex h-full w-80 shrink-0 flex-col overflow-y-auto border-r border-gray-700 bg-gray-800">
+      <div className="border-b border-gray-700 p-4">
+        <h1 className="text-lg font-semibold text-white">FOCOS</h1>
+        <p className="mt-1 text-xs text-gray-400">
           Detección automática de incendios a partir de datos satelitales
           (NASA FIRMS). Los hotspots tienen retraso de 1-3h y el nivel
-          mostrado es <strong>estimado</strong>, no el nivel oficial del 112.
+          mostrado es <strong className="text-gray-300">estimado</strong>, no
+          el nivel oficial del 112.
         </p>
       </div>
 
-      <ul className="flex-1 divide-y divide-gray-100">
+      <ul className="flex-1 divide-y divide-gray-700">
         {sorted.length === 0 && (
-          <li className="p-4 text-sm text-gray-500">
+          <li className="p-4 text-sm text-gray-400">
             Sin incendios activos detectados ahora mismo.
           </li>
         )}
@@ -40,27 +41,27 @@ export function Sidebar({
           <li key={f.properties.id}>
             <button
               onClick={() => onSelect(f.properties.id)}
-              className={`w-full px-4 py-3 text-left transition hover:bg-gray-50 ${
-                selectedId === f.properties.id ? "bg-orange-50" : ""
+              className={`w-full px-4 py-3 text-left transition hover:bg-gray-700 ${
+                selectedId === f.properties.id ? "bg-gray-700" : ""
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="font-medium">
+                <span className="font-medium text-gray-100">
                   {f.properties.name ?? "Incendio sin nombre"}
                 </span>
                 <span
                   className={`rounded px-2 py-0.5 text-xs font-medium ${
                     f.properties.level === 2
-                      ? "bg-red-100 text-red-700"
+                      ? "bg-red-900/60 text-red-200"
                       : f.properties.level === 1
-                        ? "bg-orange-100 text-orange-700"
-                        : "bg-gray-100 text-gray-600"
+                        ? "bg-orange-900/60 text-orange-200"
+                        : "bg-gray-700 text-gray-300"
                   }`}
                 >
                   {LEVEL_LABEL[f.properties.level]}
                 </span>
               </div>
-              <p className="mt-1 text-xs text-gray-500">{f.properties.desc}</p>
+              <p className="mt-1 text-xs text-gray-400">{f.properties.desc}</p>
             </button>
           </li>
         ))}
