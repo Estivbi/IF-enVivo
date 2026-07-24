@@ -40,3 +40,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Internal project docs — kept locally, not published (repo is public)
+/CLAUDE.md
+/PROMPT_INICIAL.md

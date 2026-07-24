@@ -4,8 +4,8 @@ Detección automática de incendios a partir de datos satelitales (NASA FIRMS/VI
 mostrados en un mapa en tiempo casi real. Genérico: sin listas de incendios
 mantenidas a mano — todo sale de un pipeline de clustering espacio-temporal.
 
-Ver [`CLAUDE.md`](./CLAUDE.md) para el contexto del proyecto y
-[`PROMPT_INICIAL.md`](./PROMPT_INICIAL.md) para la spec técnica completa.
+Pipeline de detección + API + frontend — genérico para cualquier incendio en
+España, sin listas mantenidas a mano.
 
 ## Stack
 
@@ -63,13 +63,9 @@ limit cubre a quien varía el query string para saltarse esa caché.
 
 ## Notas de honestidad de datos
 
-Los hotspots satelitales tienen retraso de 1-3h y **no son** el nivel oficial
-de gravedad (IGR) del 112. El `level` (0/1/2) es un cálculo heurístico
-propio — se muestra siempre como "estimado" en la interfaz, nunca como dato
-oficial. VIIRS puede fallar bajo nubes densas o humo espeso.
-
-## Equipo de agentes (Claude Code)
-
-Ver [`.claude/agents/`](./.claude/agents/): `arquitecto`, `backend`,
-`frontend`, `seguridad`, `pr-reviewer`. Flujo recomendado para cualquier
-feature nueva en `CLAUDE.md`.
+Los hotspots satelitales tienen retraso de 1-3h y **nunca sustituyen** al
+aviso oficial del 112. El estado mostrado (`active`/`inactive`) es
+deliberadamente simple: solo indica si ha habido detecciones nuevas en las
+últimas 24h, sin inventar niveles de gravedad ni tendencias (ver ADR-0002
+y ADR-0004 en `docs/adr/`). VIIRS puede fallar bajo nubes densas o humo
+espeso.
