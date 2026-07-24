@@ -30,12 +30,21 @@ export const metadata: Metadata = {
     description:
       "Mapa de incendios forestales en España a partir de datos satelitales NASA FIRMS. Detección automática actualizada cada hora.",
     locale: "es_ES",
+    images: [
+      {
+        url: `${SITE_URL}/og-image.png`,
+        width: 1024,
+        height: 1024,
+        alt: "FOCOS — Mapa de incendios forestales en España",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "FOCOS — Incendios en tiempo real en España",
     description:
       "Mapa de incendios forestales en España a partir de datos satelitales NASA FIRMS. Detección automática actualizada cada hora.",
+    images: [`${SITE_URL}/og-image.png`],
   },
   robots: {
     index: true,
