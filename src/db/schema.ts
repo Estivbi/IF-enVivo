@@ -50,6 +50,16 @@ export const hotspotPoints = pgTable(
   (table) => [index("idx_hotspot_points_event").on(table.fireEventId)],
 );
 
+// Backs a free, code-only rate limiter for the public read endpoints
+// (/api/fires, /api/fires/:id/points) — no external service required.
+export const rateLimitBuckets = pgTable("rate_limit_buckets", {
+  key: text("key").primaryKey(),
+  count: integer("count").notNull().default(1),
+  windowStart: timestamp("window_start", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 export type FireEvent = typeof fireEvents.$inferSelect;
 export type NewFireEvent = typeof fireEvents.$inferInsert;
 export type HotspotPoint = typeof hotspotPoints.$inferSelect;

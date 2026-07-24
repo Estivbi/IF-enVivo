@@ -3,15 +3,24 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { hotspotPoints } from "@/db/schema";
+import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 
 export const revalidate = 60;
 
 const paramsSchema = z.object({ id: z.uuid() });
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const { allowed } = await checkRateLimit(`fires-points:${clientIp(req)}`);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
+  }
+
   const parsed = paramsSchema.safeParse(await params);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid fire_event id" }, { status: 400 });

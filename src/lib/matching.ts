@@ -4,10 +4,14 @@ export const MATCH_RADIUS_KM = 5;
 export const INACTIVE_AFTER_HOURS = 24;
 
 /**
- * Heuristic FRP threshold (MW) for level 2. Not derived from any official
- * IGR scale — provisional value pending @arquitecto sign-off, tune here.
+ * Heuristic FRP threshold (MW) for level 2 — not derived from any official
+ * IGR scale, no calibration data exists yet. Tunable via env var so it can
+ * be adjusted from real ingest data without a redeploy.
  */
-export const LEVEL2_SUM_FRP_THRESHOLD_MW = 50;
+const DEFAULT_LEVEL2_SUM_FRP_THRESHOLD_MW = 50;
+export const LEVEL2_SUM_FRP_THRESHOLD_MW = Number(
+  process.env.LEVEL2_FRP_THRESHOLD_MW ?? DEFAULT_LEVEL2_SUM_FRP_THRESHOLD_MW,
+);
 const RECENT_WINDOW_HOURS = 6;
 
 export type ExistingEventRef = {

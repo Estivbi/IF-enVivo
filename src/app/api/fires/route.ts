@@ -3,9 +3,12 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { fireEvents } from "@/db/schema";
+import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 
 // Public, read-only, no auth — cache aggressively so a traffic spike can't
-// hammer Neon directly (see .claude/agents/seguridad.md).
+// hammer Neon directly (see .claude/agents/seguridad.md). Cache-Control
+// covers repeat requests for the same URL; checkRateLimit below covers the
+// case where a client varies the query string to dodge that cache.
 export const revalidate = 60;
 
 const querySchema = z.object({
@@ -20,6 +23,14 @@ function describe(event: typeof fireEvents.$inferSelect): string {
 }
 
 export async function GET(req: NextRequest) {
+  const { allowed } = await checkRateLimit(`fires:${clientIp(req)}`);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: { "Retry-After": "60" } },
+    );
+  }
+
   const parsed = querySchema.safeParse({
     status: req.nextUrl.searchParams.get("status") ?? undefined,
   });

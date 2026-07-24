@@ -56,6 +56,11 @@ curl -X POST http://localhost:3000/api/cron/ingest \
 - `GET /api/fires` — GeoJSON de `fire_events` (`?status=active|all`)
 - `GET /api/fires/:id/points` — puntos crudos de un incendio concreto
 
+Ambos llevan rate limiting (60 req/min por IP) respaldado en la propia tabla
+`rate_limit_buckets` de Neon — sin servicio externo, gratis (`src/lib/rate-limit.ts`).
+La caché (`Cache-Control: s-maxage=60`) cubre el tráfico normal; el rate
+limit cubre a quien varía el query string para saltarse esa caché.
+
 ## Notas de honestidad de datos
 
 Los hotspots satelitales tienen retraso de 1-3h y **no son** el nivel oficial
