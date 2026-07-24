@@ -72,6 +72,17 @@ export function Dashboard() {
         aria-hidden={!sidebarOpen}
       >
         <Sidebar fires={fires} selectedId={selectedId} onSelect={handleSelect} loading={loading} />
+        {/* Footer con links legales — solo visible en desktop (el sidebar es estático) */}
+        <footer className="hidden border-t border-gray-700 px-4 py-3 text-xs text-gray-500 md:block lg:block">
+          <div className="flex gap-3">
+            <a href="/sobre" className="hover:text-gray-300 transition">Sobre FOCOS</a>
+            <span aria-hidden>·</span>
+            <a href="/aviso-legal" className="hover:text-gray-300 transition">Aviso legal</a>
+            <span aria-hidden>·</span>
+            <a href="https://github.com/Estivbi/IF-enVivo" target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 transition">GitHub</a>
+          </div>
+        </footer>
+
       </div>
 
       <main id="main-content" className="relative flex-1">
