@@ -36,6 +36,12 @@ export async function checkRateLimit(key: string): Promise<RateLimitResult> {
 }
 
 export function clientIp(req: Request): string {
-  const forwardedFor = req.headers.get("x-forwarded-for");
-  return forwardedFor?.split(",")[0]?.trim() ?? "unknown";
+  // x-real-ip is set by Vercel's edge and cannot be spoofed by clients.
+  // x-forwarded-for is client-controlled (clients prepend their own values),
+  // so it's only used as a last resort.
+  return (
+    req.headers.get("x-real-ip") ??
+    req.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim() ??
+    "unknown"
+  );
 }

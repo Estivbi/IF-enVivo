@@ -1,5 +1,6 @@
+import crypto from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { fireEvents, hotspotPoints } from "@/db/schema";
 import { fetchFirmsHotspots, isLowConfidence } from "@/lib/firms";
@@ -12,7 +13,11 @@ export const dynamic = "force-dynamic";
 function isAuthorized(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
-  return req.headers.get("authorization") === `Bearer ${secret}`;
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader) return false;
+  const expected = `Bearer ${secret}`;
+  if (authHeader.length !== expected.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected));
 }
 
 async function updateExistingEvent(eventId: string, cluster: ClusterSummary): Promise<void> {
@@ -100,11 +105,31 @@ export async function POST(req: NextRequest) {
   return runIngest(req);
 }
 
+// Arbitrary fixed key used as a Postgres session-level advisory lock so that
+// two concurrent ingest runs (e.g. Vercel Cron + manual trigger) don't create
+// duplicate fire_events. The lock is released automatically on connection close.
+const INGEST_LOCK_KEY = 7396_2024;
+
 async function runIngest(req: NextRequest) {
   if (!isAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const lockResult = await db.execute<{ acquired: boolean }>(
+    sql`SELECT pg_try_advisory_lock(${INGEST_LOCK_KEY}) AS acquired`,
+  );
+  if (!lockResult.rows[0]?.acquired) {
+    return NextResponse.json({ skipped: "ingest already running" }, { status: 200 });
+  }
+
+  try {
+    return await runIngestLocked();
+  } finally {
+    await db.execute(sql`SELECT pg_advisory_unlock(${INGEST_LOCK_KEY})`);
+  }
+}
+
+async function runIngestLocked() {
   const firmsMapKey = process.env.FIRMS_MAP_KEY;
   const nominatimUserAgent = process.env.NOMINATIM_USER_AGENT;
   if (!firmsMapKey) {

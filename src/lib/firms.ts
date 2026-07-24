@@ -35,6 +35,7 @@ export async function fetchFirmsHotspots(
   mapKey: string,
   source: string = "VIIRS_NOAA20_NRT",
 ): Promise<RawHotspot[]> {
+  // Never log `url` — it embeds FIRMS_MAP_KEY in the path.
   const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${mapKey}/${source}/${SPAIN_BBOX}/${DAYS_BACK}`;
 
   const res = await fetch(url, { cache: "no-store" });
