@@ -83,7 +83,7 @@ const OVERLAYS: { id: OverlayId; label: string; title: string; sourceId: string;
     id: "eumetsat-msg",
     label: "Focos EUMETSAT",
     title:
-      "Detección de fuego del satélite MSG, resolución ~3km/píxel — a mucho zoom se ve en bloques grandes porque esa es la resolución real, no un error. Se oculta pasado cierto zoom para no confundir.",
+      "Detección de fuego del satélite MSG, resolución ~3km/píxel — a mucho zoom se ve en bloques grandes porque esa es la resolución real, no un error.",
     sourceId: "overlay-eumetsat-msg",
     layerId: "overlay-eumetsat-msg-layer",
   },
@@ -168,10 +168,11 @@ export function FiresMap({
         paint: { "raster-opacity": 0.85 },
       });
 
-      // MSG/SEVIRI's native resolution is ~3km/pixel — past z8 those pixels
-      // start rendering as huge, misleading squares that look like the fire
-      // itself instead of "somewhere in this 3km block". Layer maxzoom just
-      // stops rendering it rather than stretching the last tile.
+      // MSG/SEVIRI's native resolution is ~3km/pixel, so this renders as
+      // big blocky squares when zoomed in close — that's the sensor's real
+      // resolution, not a rendering bug (confirmed by inspecting the raw
+      // GetMap response directly). Left visible at every zoom on purpose:
+      // Carolina wants to keep seeing it rather than have it disappear.
       map.addSource("overlay-eumetsat-msg", {
         type: "raster",
         tiles: [eumetsatWmsUrl("msg_fes:fire")],
@@ -182,13 +183,10 @@ export function FiresMap({
         id: "overlay-eumetsat-msg-layer",
         type: "raster",
         source: "overlay-eumetsat-msg",
-        maxzoom: 8,
         layout: { visibility: activeOverlaysRef.current.has("eumetsat-msg") ? "visible" : "none" },
         paint: { "raster-opacity": 0.85 },
       });
 
-      // MTG is roughly 2-3x finer than MSG, so it holds up a bit closer in,
-      // but the same blockiness problem applies past this zoom.
       map.addSource("overlay-eumetsat-mtg", {
         type: "raster",
         tiles: [eumetsatWmsUrl("mtg_fd:rgb_firetemperature")],
@@ -199,7 +197,6 @@ export function FiresMap({
         id: "overlay-eumetsat-mtg-layer",
         type: "raster",
         source: "overlay-eumetsat-mtg",
-        maxzoom: 9,
         layout: { visibility: activeOverlaysRef.current.has("eumetsat-mtg") ? "visible" : "none" },
         paint: { "raster-opacity": 0.85 },
       });
