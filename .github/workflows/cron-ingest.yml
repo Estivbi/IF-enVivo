@@ -1,0 +1,21 @@
+name: FOCOS ingest cron
+
+on:
+  schedule:
+    - cron: "*/20 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger /api/cron/ingest
+        run: |
+          status=$(curl -s -o /tmp/response.txt -w "%{http_code}" \
+            -X GET "${{ secrets.INGEST_URL }}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+          cat /tmp/response.txt
+          if [ "$status" -ge 300 ]; then
+            echo "Ingest endpoint returned HTTP $status"
+            exit 1
+          fi

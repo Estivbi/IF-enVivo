@@ -12,7 +12,7 @@ Ver [`CLAUDE.md`](./CLAUDE.md) para el contexto del proyecto y
 - Next.js 15 + TypeScript + Tailwind + MapLibre GL
 - Drizzle ORM + Neon Postgres
 - NASA FIRMS (VIIRS NRT) + reverse geocoding con Nominatim
-- Vercel (hosting + Cron Jobs)
+- Vercel (hosting) + GitHub Actions (disparo del cron — ver ADR-0001)
 
 ## Desarrollo local
 
@@ -35,7 +35,14 @@ hace fetch de FIRMS, filtra confianza baja, agrupa con DBSCAN
 (`src/lib/clustering.ts`), matchea contra `fire_events` existentes
 (`src/lib/matching.ts`), geocodifica de forma perezosa
 (`src/lib/geocode.ts`) y cierra eventos inactivos tras 24h sin puntos nuevos.
-Configurado en [`vercel.json`](./vercel.json) para ejecutarse cada 20 min.
+El disparo cada 20 min corre por [GitHub Actions](./.github/workflows/cron-ingest.yml)
+en vez de Vercel Cron Jobs — el plan Hobby (gratis) de Vercel solo permite
+crons diarios, ver [ADR-0001](./docs/adr/0001-cron-scheduling.md). Requiere
+dos secrets en el repo (Settings → Secrets and variables → Actions):
+
+- `CRON_SECRET` — el mismo valor que en las env vars de Vercel
+- `INGEST_URL` — la URL pública de producción, p.ej.
+  `https://focos.vercel.app/api/cron/ingest`
 
 Para probarlo en local sin esperar al cron:
 
