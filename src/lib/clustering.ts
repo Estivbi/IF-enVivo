@@ -100,55 +100,59 @@ export function dbscan<T extends { lat: number; lon: number }>(
   return [...clusters.values()];
 }
 
-/** Convex hull area (Andrew's monotone chain + shoelace), planar-projected around the cluster centroid. */
-function convexHullAreaKm2(points: ClusterPoint[], centroidLat: number): number {
-  if (points.length < 3) return 0;
+/**
+ * Convex hull (Andrew's monotone chain) over raw [lon, lat] pairs. A convex
+ * hull's vertex set is invariant under axis scaling (lon/lat degrees vs. a
+ * projected km grid are just anisotropic scaling of each other), so this
+ * gives the correct hull shape directly in GeoJSON's native [lon, lat]
+ * order — reused both for the area estimate below and for the frontend's
+ * "estimated perimeter" polygon layer.
+ */
+export function convexHull(points: { lat: number; lon: number }[]): [number, number][] {
+  if (points.length < 3) return [];
 
-  const kmPerDegLat = 111.32;
-  const kmPerDegLon = 111.32 * Math.cos(toRad(centroidLat));
-
-  const xy = points.map((p) => ({
-    x: p.lon * kmPerDegLon,
-    y: p.lat * kmPerDegLat,
-  }));
-
-  const sorted = [...xy].sort((a, b) => (a.x === b.x ? a.y - b.y : a.x - b.x));
+  const sorted = [...points].sort((a, b) => (a.lon === b.lon ? a.lat - b.lat : a.lon - b.lon));
   const cross = (
-    o: { x: number; y: number },
-    a: { x: number; y: number },
-    b: { x: number; y: number },
-  ) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    o: { lat: number; lon: number },
+    a: { lat: number; lon: number },
+    b: { lat: number; lon: number },
+  ) => (a.lon - o.lon) * (b.lat - o.lat) - (a.lat - o.lat) * (b.lon - o.lon);
 
-  const lower: { x: number; y: number }[] = [];
+  const lower: { lat: number; lon: number }[] = [];
   for (const p of sorted) {
-    while (
-      lower.length >= 2 &&
-      cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0
-    ) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) {
       lower.pop();
     }
     lower.push(p);
   }
 
-  const upper: { x: number; y: number }[] = [];
+  const upper: { lat: number; lon: number }[] = [];
   for (let i = sorted.length - 1; i >= 0; i--) {
     const p = sorted[i];
-    while (
-      upper.length >= 2 &&
-      cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0
-    ) {
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) {
       upper.pop();
     }
     upper.push(p);
   }
 
   const hull = [...lower.slice(0, -1), ...upper.slice(0, -1)];
+  if (hull.length < 3) return [];
+  return hull.map((p): [number, number] => [p.lon, p.lat]);
+}
+
+/** Convex hull area in km², planar-projected around the cluster centroid. */
+function convexHullAreaKm2(points: ClusterPoint[], centroidLat: number): number {
+  const hull = convexHull(points);
   if (hull.length < 3) return 0;
 
+  const kmPerDegLat = 111.32;
+  const kmPerDegLon = 111.32 * Math.cos(toRad(centroidLat));
+  const xy = hull.map(([lon, lat]) => ({ x: lon * kmPerDegLon, y: lat * kmPerDegLat }));
+
   let area = 0;
-  for (let i = 0; i < hull.length; i++) {
-    const a = hull[i];
-    const b = hull[(i + 1) % hull.length];
+  for (let i = 0; i < xy.length; i++) {
+    const a = xy[i];
+    const b = xy[(i + 1) % xy.length];
     area += a.x * b.y - b.x * a.y;
   }
   return Math.abs(area) / 2;

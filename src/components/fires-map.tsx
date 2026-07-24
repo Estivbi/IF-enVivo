@@ -6,6 +6,7 @@ import {
   NavigationControl,
   Popup,
   type GeoJSONSource,
+  type MapGeoJSONFeature,
   type StyleSpecification,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -109,10 +110,35 @@ export function FiresMap({
         type: "geojson",
         data: hotspotPointsRef.current as unknown as GeoJSON.FeatureCollection,
       });
+      // Our own estimate (convex hull of the raw detections) — not an
+      // official burned-area perimeter. Copernicus EFFIS would give us the
+      // real thing but its service has been down all day; see ADR-0005.
+      map.addLayer({
+        id: "hotspot-perimeter-fill",
+        type: "fill",
+        source: "hotspot-points",
+        filter: ["==", ["get", "kind"], "estimated_perimeter"],
+        paint: {
+          "fill-color": "#dc2626",
+          "fill-opacity": 0.15,
+        },
+      });
+      map.addLayer({
+        id: "hotspot-perimeter-outline",
+        type: "line",
+        source: "hotspot-points",
+        filter: ["==", ["get", "kind"], "estimated_perimeter"],
+        paint: {
+          "line-color": "#dc2626",
+          "line-width": 1.5,
+          "line-dasharray": [2, 2],
+        },
+      });
       map.addLayer({
         id: "hotspot-points-circles",
         type: "circle",
         source: "hotspot-points",
+        filter: ["==", ["get", "kind"], "hotspot"],
         paint: {
           "circle-radius": 4,
           "circle-color": "#dc2626",
@@ -142,11 +168,11 @@ export function FiresMap({
         },
       });
 
-      const popup = new Popup({ closeButton: false, offset: 12, className: "fire-popup" });
-      map.on("mouseenter", "fire-events-circles", (e) => {
-        map.getCanvas().style.cursor = "pointer";
-        const feature = e.features?.[0];
-        if (!feature) return;
+      // Popup reutilizable — se abre en mouseenter (escritorio) y en click
+      // (táctil/teclado) para que sea accesible en todos los dispositivos.
+      const popup = new Popup({ closeButton: true, offset: 12, className: "fire-popup" });
+
+      function showPopup(feature: MapGeoJSONFeature, lngLat: [number, number]) {
         const props = feature.properties as {
           name?: string;
           desc?: string;
@@ -156,18 +182,31 @@ export function FiresMap({
         const searchQuery = `112 incendio ${[props.municipality, props.province].filter(Boolean).join(" ")}`.trim();
         const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`;
         popup
-          .setLngLat((feature.geometry as GeoJSON.Point).coordinates as [number, number])
+          .setLngLat(lngLat)
           .setHTML(
             `<strong>${escapeHtml(props.name ?? "Incendio sin nombre")}</strong><br/>${escapeHtml(props.desc ?? "")}<br/><em>Detección automática, no sustituye al 112</em><br/><a href="${searchUrl}" target="_blank" rel="noopener noreferrer">Buscar información oficial ↗</a>`,
           )
           .addTo(map);
+      }
+
+      map.on("mouseenter", "fire-events-circles", (e) => {
+        map.getCanvas().style.cursor = "pointer";
+        const feature = e.features?.[0];
+        if (!feature) return;
+        showPopup(feature, (feature.geometry as GeoJSON.Point).coordinates as [number, number]);
       });
       map.on("mouseleave", "fire-events-circles", () => {
         map.getCanvas().style.cursor = "";
         popup.remove();
       });
       map.on("click", "fire-events-circles", (e) => {
-        const id = e.features?.[0]?.properties?.id as string | undefined;
+        const feature = e.features?.[0];
+        if (!feature) return;
+        // En táctil/teclado el mouseenter no se dispara — mostrar popup en click
+        if (!popup.isOpen()) {
+          showPopup(feature, (feature.geometry as GeoJSON.Point).coordinates as [number, number]);
+        }
+        const id = feature.properties?.id as string | undefined;
         if (id) onSelectRef.current(id);
       });
     });
@@ -215,18 +254,30 @@ export function FiresMap({
   }
 
   return (
-    <div className="relative h-full w-full">
+    <div
+      className="relative h-full w-full"
+      role="application"
+      aria-label="Mapa de incendios forestales en España"
+    >
       <div ref={containerRef} className="h-full w-full" />
-      <div className="absolute bottom-6 left-2 z-10 flex overflow-hidden rounded border border-gray-700 text-xs shadow">
+      <div
+        className="absolute bottom-6 left-2 z-10 flex overflow-hidden rounded border border-gray-700 text-xs shadow"
+        role="group"
+        aria-label="Tipo de mapa base"
+      >
         <button
           onClick={() => switchBasemap("streets")}
-          className={`px-2 py-1 ${basemap === "streets" ? "bg-gray-800 text-white" : "bg-white text-gray-700"}`}
+          aria-pressed={basemap === "streets"}
+          aria-label="Vista de calle"
+          className={`px-2 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500 ${basemap === "streets" ? "bg-gray-800 text-white" : "bg-white text-gray-700"}`}
         >
           Calle
         </button>
         <button
           onClick={() => switchBasemap("satellite")}
-          className={`px-2 py-1 ${basemap === "satellite" ? "bg-gray-800 text-white" : "bg-white text-gray-700"}`}
+          aria-pressed={basemap === "satellite"}
+          aria-label="Vista satélite"
+          className={`px-2 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500 ${basemap === "satellite" ? "bg-gray-800 text-white" : "bg-white text-gray-700"}`}
         >
           Satélite
         </button>

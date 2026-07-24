@@ -26,6 +26,7 @@ export type FireEventCollection = {
 };
 
 export type HotspotPointProperties = {
+  kind: "hotspot";
   id: number;
   acqAt: string;
   frp: number | null;
@@ -39,7 +40,15 @@ export type HotspotPointFeature = {
   properties: HotspotPointProperties;
 };
 
+// Our own convex-hull estimate of the burned area, not an official
+// perimeter — see ADR-0005.
+export type EstimatedPerimeterFeature = {
+  type: "Feature";
+  geometry: { type: "Polygon"; coordinates: [number, number][][] };
+  properties: { kind: "estimated_perimeter" };
+};
+
 export type HotspotPointCollection = {
   type: "FeatureCollection";
-  features: HotspotPointFeature[];
+  features: (HotspotPointFeature | EstimatedPerimeterFeature)[];
 };

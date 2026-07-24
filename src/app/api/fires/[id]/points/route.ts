@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { hotspotPoints } from "@/db/schema";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
+import { convexHull } from "@/lib/clustering";
 
 export const revalidate = 60;
 
@@ -31,22 +32,39 @@ export async function GET(
     .from(hotspotPoints)
     .where(eq(hotspotPoints.fireEventId, parsed.data.id));
 
+  const pointFeatures = rows.map((point) => ({
+    type: "Feature" as const,
+    geometry: {
+      type: "Point" as const,
+      coordinates: [point.lon, point.lat],
+    },
+    properties: {
+      kind: "hotspot" as const,
+      id: point.id,
+      acqAt: point.acqAt.toISOString(),
+      frp: point.frp,
+      confidence: point.confidence,
+      satellite: point.satellite,
+    },
+  }));
+
+  // Own estimate only — a convex hull of the raw detections, not an
+  // official burned-area perimeter (we wanted Copernicus EFFIS for that,
+  // but its WFS service has been down for hours; see ADR-0005).
+  const hull = convexHull(rows.map((p) => ({ lat: p.lat, lon: p.lon })));
+  const perimeterFeature = hull.length >= 3
+    ? [
+        {
+          type: "Feature" as const,
+          geometry: { type: "Polygon" as const, coordinates: [[...hull, hull[0]]] },
+          properties: { kind: "estimated_perimeter" as const },
+        },
+      ]
+    : [];
+
   const geojson = {
     type: "FeatureCollection" as const,
-    features: rows.map((point) => ({
-      type: "Feature" as const,
-      geometry: {
-        type: "Point" as const,
-        coordinates: [point.lon, point.lat],
-      },
-      properties: {
-        id: point.id,
-        acqAt: point.acqAt.toISOString(),
-        frp: point.frp,
-        confidence: point.confidence,
-        satellite: point.satellite,
-      },
-    })),
+    features: [...perimeterFeature, ...pointFeatures],
   };
 
   return NextResponse.json(geojson, {
