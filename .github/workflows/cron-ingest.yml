@@ -11,7 +11,11 @@ jobs:
     steps:
       - name: Trigger /api/cron/ingest
         run: |
-          status=$(curl -sL -o /tmp/response.txt -w "%{http_code}" \
+          # --location-trusted preserva el header Authorization en los redirects
+          # (sin él, curl descarta Authorization al seguir el 307 de Vercel).
+          # INGEST_URL debe apuntar al dominio canonical del proyecto en Vercel,
+          # actualmente: https://focosif.vercel.app/api/cron/ingest
+          status=$(curl -sL --location-trusted -o /tmp/response.txt -w "%{http_code}" \
             -X GET "${{ secrets.INGEST_URL }}" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
           cat /tmp/response.txt
