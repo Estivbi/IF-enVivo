@@ -6,10 +6,22 @@ import type { FireEventCollection } from "@/lib/types";
 // Deliberately just active/inactive — see ADR-0004. A "stable vs growing"
 // distinction existed before but relied on comparing satellite-detected
 // point counts between cron runs, too noisy a signal to call reliable.
-function statusBadge(status: "active" | "inactive"): { label: string; className: string } {
+function statusBadge(status: "active" | "inactive"): {
+  label: string;
+  className: string;
+  title: string;
+} {
   return status === "active"
-    ? { label: "Activo", className: "bg-orange-900/60 text-orange-200" }
-    : { label: "Inactivo", className: "bg-gray-700 text-gray-300" };
+    ? {
+        label: "Activo",
+        className: "bg-orange-900/60 text-orange-200",
+        title: "El satélite ha detectado focos nuevos en este incendio en las últimas 24h.",
+      }
+    : {
+        label: "Inactivo",
+        className: "bg-gray-700 text-gray-300",
+        title: "Sin focos nuevos detectados por el satélite en las últimas 24h.",
+      };
 }
 
 // Reference link only — no scraping, no copied content. Lets the user check
@@ -88,7 +100,10 @@ export function Sidebar({
                   <span className="font-medium text-gray-100">
                     {f.properties.name ?? "Incendio sin nombre"}
                   </span>
-                  <span className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${badge.className}`}>
+                  <span
+                    title={badge.title}
+                    className={`shrink-0 cursor-help rounded px-2 py-0.5 text-xs font-medium ${badge.className}`}
+                  >
                     {badge.label}
                   </span>
                 </div>
