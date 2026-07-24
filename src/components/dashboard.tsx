@@ -12,6 +12,7 @@ export function Dashboard() {
   const [fires, setFires] = useState<FireEventCollection>(EMPTY);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -30,16 +31,40 @@ export function Dashboard() {
     return () => clearInterval(interval);
   }, [load]);
 
+  function handleSelect(id: string) {
+    setSelectedId(id);
+    setSidebarOpen(false);
+  }
+
   return (
-    <div className="flex h-screen w-screen">
-      <Sidebar fires={fires} selectedId={selectedId} onSelect={setSelectedId} />
+    <div className="relative flex h-screen w-screen overflow-hidden">
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-20 bg-black/50 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <div
+        className={`fixed inset-y-0 left-0 z-30 w-80 max-w-full transition-transform duration-200 md:static md:z-auto md:translate-x-0 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <Sidebar fires={fires} selectedId={selectedId} onSelect={handleSelect} />
+      </div>
       <div className="relative flex-1">
+        <button
+          onClick={() => setSidebarOpen(true)}
+          aria-label="Abrir lista de incendios"
+          className="absolute left-2 top-2 z-10 rounded bg-gray-800 px-3 py-2 text-sm text-white shadow md:hidden"
+        >
+          ☰
+        </button>
         {error && (
-          <div className="absolute left-1/2 top-4 z-10 -translate-x-1/2 rounded bg-red-600 px-3 py-1.5 text-sm text-white shadow">
+          <div className="absolute left-1/2 top-2 z-10 -translate-x-1/2 rounded bg-red-600 px-3 py-1.5 text-sm text-white shadow">
             {error}
           </div>
         )}
-        <FiresMap fires={fires} selectedId={selectedId} />
+        <FiresMap fires={fires} selectedId={selectedId} onSelect={handleSelect} />
       </div>
     </div>
   );

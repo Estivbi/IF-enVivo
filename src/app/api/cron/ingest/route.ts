@@ -24,6 +24,7 @@ async function updateExistingEvent(
   eventId: string,
   cluster: ClusterSummary,
   previousPointCount: number | undefined,
+  previousTimesObserved: number,
 ): Promise<void> {
   await db
     .update(fireEvents)
@@ -32,6 +33,7 @@ async function updateExistingEvent(
       centroidLon: cluster.centroidLon,
       status: "active",
       level: computeLevel(cluster, previousPointCount),
+      timesObserved: previousTimesObserved + 1,
       pointCount: cluster.pointCount,
       maxFrp: cluster.maxFrp,
       sumFrp: cluster.sumFrp,
@@ -143,6 +145,7 @@ async function runIngest(req: NextRequest) {
       centroidLon: fireEvents.centroidLon,
       pointCount: fireEvents.pointCount,
       lastDetectedAt: fireEvents.lastDetectedAt,
+      timesObserved: fireEvents.timesObserved,
     })
     .from(fireEvents)
     .where(eq(fireEvents.status, "active"));
@@ -164,7 +167,12 @@ async function runIngest(req: NextRequest) {
   for (const match of matches) {
     if (match.matchedEventId) {
       const previous = activeEvents.find((e) => e.id === match.matchedEventId);
-      await updateExistingEvent(match.matchedEventId, match.cluster, previous?.pointCount);
+      await updateExistingEvent(
+        match.matchedEventId,
+        match.cluster,
+        previous?.pointCount,
+        previous?.timesObserved ?? 1,
+      );
       await insertNewPoints(match.matchedEventId, match.cluster, previous?.lastDetectedAt ?? null);
       continue;
     }

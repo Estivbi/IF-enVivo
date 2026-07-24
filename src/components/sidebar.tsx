@@ -1,12 +1,16 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { FireEventCollection } from "@/lib/types";
 
-const LEVEL_LABEL: Record<number, string> = {
-  0: "Inactivo",
-  1: "Estable",
-  2: "En crecimiento",
-};
+function statusBadge(level: 0 | 1 | 2, timesObserved: number): { label: string; className: string } {
+  if (level === 0) return { label: "Inactivo", className: "bg-gray-700 text-gray-300" };
+  // level is only a real trend once compared across ≥2 cron runs — a
+  // brand-new detection is honestly "new", not "stable" (see ADR-0002).
+  if (timesObserved <= 1) return { label: "Nuevo", className: "bg-blue-900/60 text-blue-200" };
+  if (level === 2) return { label: "En crecimiento", className: "bg-red-900/60 text-red-200" };
+  return { label: "Estable", className: "bg-orange-900/60 text-orange-200" };
+}
 
 // Reference link only — no scraping, no copied content. Lets the user check
 // official sources (112/Protección Civil) themselves; see ADR-0003.
@@ -14,6 +18,27 @@ function officialInfoSearchUrl(municipality: string | null, province: string | n
   const place = [municipality, province].filter(Boolean).join(" ");
   const query = `112 incendio ${place}`.trim();
   return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+}
+
+function LiveClock() {
+  const [now, setNow] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setNow(new Date());
+    const interval = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (!now) return null;
+
+  return (
+    <p className="mt-1 font-mono text-xs text-gray-500">
+      {now.toLocaleString("es-ES", {
+        dateStyle: "medium",
+        timeStyle: "medium",
+      })}
+    </p>
+  );
 }
 
 export function Sidebar({
@@ -28,10 +53,11 @@ export function Sidebar({
   const sorted = [...fires.features].sort((a, b) => b.properties.level - a.properties.level);
 
   return (
-    <aside className="flex h-full w-80 shrink-0 flex-col overflow-y-auto border-r border-gray-700 bg-gray-800">
+    <aside className="flex h-full w-full flex-col overflow-y-auto bg-gray-800 md:w-80 md:shrink-0 md:border-r md:border-gray-700">
       <div className="border-b border-gray-700 p-4">
         <h1 className="text-lg font-semibold text-white">FOCOS</h1>
-        <p className="mt-1 text-xs text-gray-400">
+        <LiveClock />
+        <p className="mt-2 text-xs text-gray-400">
           Detección automática de incendios a partir de datos satelitales
           (NASA FIRMS). Los hotspots tienen retraso de 1-3h y el nivel
           mostrado es <strong className="text-gray-300">estimado</strong>, no
@@ -45,44 +71,39 @@ export function Sidebar({
             Sin incendios activos detectados ahora mismo.
           </li>
         )}
-        {sorted.map((f) => (
-          <li
-            key={f.properties.id}
-            className={selectedId === f.properties.id ? "bg-gray-700" : ""}
-          >
-            <button
-              onClick={() => onSelect(f.properties.id)}
-              className="w-full px-4 pt-3 text-left transition hover:bg-gray-700"
+        {sorted.map((f) => {
+          const badge = statusBadge(f.properties.level, f.properties.timesObserved);
+          return (
+            <li
+              key={f.properties.id}
+              className={selectedId === f.properties.id ? "bg-gray-700" : ""}
             >
-              <div className="flex items-center justify-between">
-                <span className="font-medium text-gray-100">
-                  {f.properties.name ?? "Incendio sin nombre"}
-                </span>
-                <span
-                  className={`rounded px-2 py-0.5 text-xs font-medium ${
-                    f.properties.level === 2
-                      ? "bg-red-900/60 text-red-200"
-                      : f.properties.level === 1
-                        ? "bg-orange-900/60 text-orange-200"
-                        : "bg-gray-700 text-gray-300"
-                  }`}
-                >
-                  {LEVEL_LABEL[f.properties.level]}
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-gray-400">{f.properties.desc}</p>
-            </button>
-            <a
-              href={officialInfoSearchUrl(f.properties.municipality, f.properties.province)}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="mb-3 ml-4 mt-1 inline-block text-xs text-orange-300 hover:text-orange-200 hover:underline"
-            >
-              Buscar información oficial ↗
-            </a>
-          </li>
-        ))}
+              <button
+                onClick={() => onSelect(f.properties.id)}
+                className="w-full px-4 pt-3 text-left transition hover:bg-gray-700"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-gray-100">
+                    {f.properties.name ?? "Incendio sin nombre"}
+                  </span>
+                  <span className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${badge.className}`}>
+                    {badge.label}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-gray-400">{f.properties.desc}</p>
+              </button>
+              <a
+                href={officialInfoSearchUrl(f.properties.municipality, f.properties.province)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="mb-3 ml-4 mt-1 inline-block text-xs text-orange-300 hover:text-orange-200 hover:underline"
+              >
+                Buscar información oficial ↗
+              </a>
+            </li>
+          );
+        })}
       </ul>
     </aside>
   );

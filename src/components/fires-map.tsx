@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Map as MapLibreMap,
   NavigationControl,
   Popup,
   type GeoJSONSource,
+  type StyleSpecification,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { FireEventCollection, HotspotPointCollection } from "@/lib/types";
@@ -20,6 +21,28 @@ const LEVEL_COLOR: Record<number, string> = {
 
 const EMPTY_POINTS: HotspotPointCollection = { type: "FeatureCollection", features: [] };
 
+const STREETS_STYLE = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
+// Esri World Imagery — free, no API key, no usage cap for this kind of
+// low-volume public app. Kept as a plain style object (no external style.json
+// fetch needed) so switching basemaps can't hit the same kind of external
+// service issue the GIBS vector layer did.
+const SATELLITE_STYLE: StyleSpecification = {
+  version: 8,
+  sources: {
+    satellite: {
+      type: "raster",
+      tiles: [
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      ],
+      tileSize: 256,
+      attribution: "Esri, Maxar, Earthstar Geographics",
+    },
+  },
+  layers: [{ id: "satellite", type: "raster", source: "satellite" }],
+};
+
+type Basemap = "streets" | "satellite";
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -31,41 +54,50 @@ function escapeHtml(value: string): string {
 export function FiresMap({
   fires,
   selectedId,
+  onSelect,
 }: {
   fires: FireEventCollection;
   selectedId: string | null;
+  onSelect: (id: string) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
-  // 'load' fires asynchronously (style/sprite/glyphs), which can resolve
-  // after the /api/fires fetch already updated `fires` — read this ref
-  // instead of the closure-captured prop so 'load' always sees the latest
-  // data instead of locking in whatever `fires` was at mount time (likely
-  // still empty).
+  const [basemap, setBasemap] = useState<Basemap>("streets");
+
+  // 'style.load' fires asynchronously (and again on every setStyle() call),
+  // which can resolve after the /api/fires fetch already updated `fires` —
+  // read these refs instead of closure-captured props/state so re-adding
+  // sources after a basemap switch always uses the latest data.
   const firesRef = useRef(fires);
   firesRef.current = fires;
+  const hotspotPointsRef = useRef<HotspotPointCollection>(EMPTY_POINTS);
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
     const map = new MapLibreMap({
       container: containerRef.current,
-      style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+      style: STREETS_STYLE,
       center: SPAIN_CENTER,
       zoom: 5.5,
     });
     mapRef.current = map;
     map.addControl(new NavigationControl(), "top-right");
 
-    map.on("load", () => {
+    // Fires on the initial style load and again after every setStyle() call
+    // (basemap switch) — re-adding our sources/layers here keeps them alive
+    // across a full basemap swap instead of only on first mount.
+    map.on("style.load", () => {
       // Raw hotspot "cloud" for the selected fire — populated lazily from
-      // /api/fires/:id/points (see the selectedId effect below). NASA GIBS's
-      // own vector-tile hotspot layer returns 404 on every tile/date tested
-      // as of this writing, so this uses our own already-ingested points
-      // instead of that external service.
+      // /api/fires/:id/points. NASA GIBS's own vector-tile hotspot layer
+      // returns 404 on every tile/date tested as of this writing, so this
+      // uses our own already-ingested points instead of that external
+      // service.
       map.addSource("hotspot-points", {
         type: "geojson",
-        data: EMPTY_POINTS as unknown as GeoJSON.FeatureCollection,
+        data: hotspotPointsRef.current as unknown as GeoJSON.FeatureCollection,
       });
       map.addLayer({
         id: "hotspot-points-circles",
@@ -101,7 +133,7 @@ export function FiresMap({
         },
       });
 
-      const popup = new Popup({ closeButton: false, offset: 12 });
+      const popup = new Popup({ closeButton: false, offset: 12, className: "fire-popup" });
       map.on("mouseenter", "fire-events-circles", (e) => {
         map.getCanvas().style.cursor = "pointer";
         const feature = e.features?.[0];
@@ -124,6 +156,10 @@ export function FiresMap({
       map.on("mouseleave", "fire-events-circles", () => {
         map.getCanvas().style.cursor = "";
         popup.remove();
+      });
+      map.on("click", "fire-events-circles", (e) => {
+        const id = e.features?.[0]?.properties?.id as string | undefined;
+        if (id) onSelectRef.current(id);
       });
     });
 
@@ -152,6 +188,7 @@ export function FiresMap({
       .then((res) => (res.ok ? (res.json() as Promise<HotspotPointCollection>) : null))
       .then((data) => {
         if (cancelled || !data) return;
+        hotspotPointsRef.current = data;
         const source = map.getSource("hotspot-points") as GeoJSONSource | undefined;
         source?.setData(data as unknown as GeoJSON.FeatureCollection);
       });
@@ -161,5 +198,30 @@ export function FiresMap({
     };
   }, [selectedId, fires]);
 
-  return <div ref={containerRef} className="h-full w-full" />;
+  function switchBasemap(next: Basemap) {
+    const map = mapRef.current;
+    if (!map || next === basemap) return;
+    setBasemap(next);
+    map.setStyle(next === "streets" ? STREETS_STYLE : SATELLITE_STYLE);
+  }
+
+  return (
+    <div className="relative h-full w-full">
+      <div ref={containerRef} className="h-full w-full" />
+      <div className="absolute bottom-6 left-2 z-10 flex overflow-hidden rounded border border-gray-700 text-xs shadow">
+        <button
+          onClick={() => switchBasemap("streets")}
+          className={`px-2 py-1 ${basemap === "streets" ? "bg-gray-800 text-white" : "bg-white text-gray-700"}`}
+        >
+          Calle
+        </button>
+        <button
+          onClick={() => switchBasemap("satellite")}
+          className={`px-2 py-1 ${basemap === "satellite" ? "bg-gray-800 text-white" : "bg-white text-gray-700"}`}
+        >
+          Satélite
+        </button>
+      </div>
+    </div>
+  );
 }

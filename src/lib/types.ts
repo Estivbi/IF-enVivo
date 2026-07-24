@@ -6,6 +6,7 @@ export type FireEventProperties = {
   status: "active" | "inactive";
   level: 0 | 1 | 2;
   levelIsEstimated: true;
+  timesObserved: number;
   pointCount: number;
   maxFrp: number | null;
   sumFrp: number | null;

@@ -22,6 +22,10 @@ export const fireEvents = pgTable(
     centroidLon: doublePrecision("centroid_lon").notNull(),
     status: text("status").notNull().default("active"), // active | inactive
     level: smallint("level").notNull().default(0), // 0,1,2 heurístico
+    // How many cron runs have touched this event. level is only a real
+    // trend (stable/growing) once we've compared at least 2 runs — on the
+    // first ever observation it's honestly "new", not "stable".
+    timesObserved: integer("times_observed").notNull().default(1),
     pointCount: integer("point_count").notNull().default(0),
     maxFrp: real("max_frp"),
     sumFrp: real("sum_frp"),
