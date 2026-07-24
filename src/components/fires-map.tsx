@@ -18,9 +18,20 @@ const LEVEL_COLOR: Record<number, string> = {
   2: "#dc2626", // red
 };
 
+const GIBS_LAYER = "VIIRS_SNPP_Thermal_Anomalies_375m_All";
+// GIBS retired the raster PNG hotspot layer — it now only ships this as
+// vector tiles (.mvt), matrix set/source-layer per its own published style:
+// https://gibs.earthdata.nasa.gov/vector-styles/v1.0/FIRMS_VIIRS_Thermal_Anomalies.json
+const GIBS_SOURCE_LAYER = `${GIBS_LAYER}_v1_NRT`;
+
 function gibsFireTileUrl(): string {
-  const today = new Date().toISOString().slice(0, 10);
-  return `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_Thermal_Anomalies_375m_All/default/${today}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png`;
+  // NRT imagery for "today" isn't published yet (its own processing lag, on
+  // top of the 1-3h satellite delay) — request yesterday, the most recent
+  // day reliably available.
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+  return `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${GIBS_LAYER}/default/${yesterday}/GoogleMapsCompatible_Level8/{z}/{y}/{x}.mvt`;
 }
 
 export function FiresMap({
@@ -47,17 +58,21 @@ export function FiresMap({
 
     map.on("load", () => {
       map.addSource("gibs-heat", {
-        type: "raster",
+        type: "vector",
         tiles: [gibsFireTileUrl()],
-        tileSize: 256,
-        maxzoom: 9,
+        maxzoom: 8,
         attribution: "NASA GIBS / VIIRS",
       });
       map.addLayer({
         id: "gibs-heat-layer",
-        type: "raster",
+        type: "circle",
         source: "gibs-heat",
-        paint: { "raster-opacity": 0.65 },
+        "source-layer": GIBS_SOURCE_LAYER,
+        paint: {
+          "circle-radius": ["step", ["zoom"], 1, 5, 2, 8, 3],
+          "circle-color": "rgb(240, 40, 40)",
+          "circle-opacity": 0.65,
+        },
       });
 
       map.addSource("fire-events", {
