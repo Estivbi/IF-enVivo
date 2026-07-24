@@ -56,24 +56,20 @@ describe("matchClustersToEvents", () => {
 });
 
 describe("computeLevel", () => {
-  it("returns level 2 when recent FRP is high and the cluster is growing", () => {
-    const cluster = fakeCluster({
-      sumFrp: 80,
-      points: [
-        { lat: 40.36, lon: -4.66, frp: 80, acqAt: new Date("2026-07-20T02:00:00Z") },
-      ],
-      lastSeen: new Date("2026-07-20T02:00:00Z"),
-    });
-    expect(computeLevel(cluster, 2)).toBe(2);
+  it("returns level 2 when point_count grew since the previous run", () => {
+    const cluster = fakeCluster({ pointCount: 6 });
+    expect(computeLevel(cluster, 4)).toBe(2);
   });
 
-  it("returns level 1 when stable or below threshold", () => {
-    const cluster = fakeCluster({
-      points: [
-        { lat: 40.36, lon: -4.66, frp: 5, acqAt: new Date("2026-07-20T02:00:00Z") },
-      ],
-    });
+  it("returns level 1 when point_count is stable or decreasing", () => {
+    const cluster = fakeCluster({ pointCount: 4 });
     expect(computeLevel(cluster, 10)).toBe(1);
+    expect(computeLevel(cluster, 4)).toBe(1);
+  });
+
+  it("returns level 1 for a brand-new event with no previous run to compare", () => {
+    const cluster = fakeCluster({ pointCount: 4 });
+    expect(computeLevel(cluster, undefined)).toBe(1);
   });
 });
 

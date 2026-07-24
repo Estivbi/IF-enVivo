@@ -3,17 +3,6 @@ import { haversineKm, type ClusterSummary } from "./clustering";
 export const MATCH_RADIUS_KM = 5;
 export const INACTIVE_AFTER_HOURS = 24;
 
-/**
- * Heuristic FRP threshold (MW) for level 2 — not derived from any official
- * IGR scale, no calibration data exists yet. Tunable via env var so it can
- * be adjusted from real ingest data without a redeploy.
- */
-const DEFAULT_LEVEL2_SUM_FRP_THRESHOLD_MW = 50;
-export const LEVEL2_SUM_FRP_THRESHOLD_MW = Number(
-  process.env.LEVEL2_FRP_THRESHOLD_MW ?? DEFAULT_LEVEL2_SUM_FRP_THRESHOLD_MW,
-);
-const RECENT_WINDOW_HOURS = 6;
-
 export type ExistingEventRef = {
   id: string;
   centroidLat: number;
@@ -64,24 +53,19 @@ export function matchClustersToEvents(
 }
 
 /**
- * Heuristic severity level — never the official 112/IGR level, must always
- * be surfaced to users as "estimated" (see CLAUDE.md honesty-of-data rules).
+ * Heuristic activity level — never the official 112/IGR severity, must
+ * always be surfaced to users as "estimated" (see CLAUDE.md honesty-of-data
+ * rules). Deliberately based only on the observed point_count trend, not on
+ * any invented FRP threshold — actual severity is for the authorities to
+ * declare, not for this pipeline to guess at.
  */
 export function computeLevel(
   cluster: ClusterSummary,
   previousPointCount: number | undefined,
 ): 0 | 1 | 2 {
-  const recentCutoff =
-    cluster.lastSeen.getTime() - RECENT_WINDOW_HOURS * 60 * 60 * 1000;
-  const recentSumFrp = cluster.points
-    .filter((p) => p.acqAt.getTime() >= recentCutoff)
-    .reduce((sum, p) => sum + (p.frp || 0), 0);
-
   const isGrowing =
     previousPointCount !== undefined && cluster.pointCount > previousPointCount;
-
-  if (recentSumFrp >= LEVEL2_SUM_FRP_THRESHOLD_MW && isGrowing) return 2;
-  return 1;
+  return isGrowing ? 2 : 1;
 }
 
 export function isStale(lastDetectedAt: Date, now: Date = new Date()): boolean {
