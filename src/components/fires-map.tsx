@@ -37,8 +37,20 @@ const SATELLITE_STYLE: StyleSpecification = {
       tileSize: 256,
       attribution: "Esri, Maxar, Earthstar Geographics",
     },
+    // Place names/boundaries overlay — World_Imagery on its own has no
+    // labels at all, this is Esri's own "hybrid" companion layer for it.
+    "satellite-labels": {
+      type: "raster",
+      tiles: [
+        "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+      ],
+      tileSize: 256,
+    },
   },
-  layers: [{ id: "satellite", type: "raster", source: "satellite" }],
+  layers: [
+    { id: "satellite", type: "raster", source: "satellite" },
+    { id: "satellite-labels", type: "raster", source: "satellite-labels" },
+  ],
 };
 
 type Basemap = "streets" | "satellite";
