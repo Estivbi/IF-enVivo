@@ -61,11 +61,6 @@ export async function GET(req: NextRequest) {
         municipality: event.municipality,
         province: event.province,
         status: event.status,
-        level: event.level,
-        levelIsEstimated: true,
-        // level is only a real trend once compared across ≥2 cron runs —
-        // frontend should show "new" instead of "stable" while this is 1.
-        timesObserved: event.timesObserved,
         pointCount: event.pointCount,
         maxFrp: event.maxFrp,
         sumFrp: event.sumFrp,

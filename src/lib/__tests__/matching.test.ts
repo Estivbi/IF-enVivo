@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ClusterSummary } from "../clustering";
-import {
-  computeLevel,
-  isStale,
-  matchClustersToEvents,
-  MATCH_RADIUS_KM,
-} from "../matching";
+import { isStale, matchClustersToEvents, MATCH_RADIUS_KM } from "../matching";
 
 function fakeCluster(overrides: Partial<ClusterSummary> = {}): ClusterSummary {
   return {
@@ -26,18 +21,14 @@ function fakeCluster(overrides: Partial<ClusterSummary> = {}): ClusterSummary {
 describe("matchClustersToEvents", () => {
   it("matches a cluster to an existing event within 5km", () => {
     const cluster = fakeCluster();
-    const existing = [
-      { id: "evt-1", centroidLat: 40.361, centroidLon: -4.661, pointCount: 3 },
-    ];
+    const existing = [{ id: "evt-1", centroidLat: 40.361, centroidLon: -4.661 }];
     const [match] = matchClustersToEvents([cluster], existing);
     expect(match.matchedEventId).toBe("evt-1");
   });
 
   it("does not match beyond MATCH_RADIUS_KM", () => {
     const cluster = fakeCluster();
-    const existing = [
-      { id: "evt-far", centroidLat: 41.5, centroidLon: -3.0, pointCount: 3 },
-    ];
+    const existing = [{ id: "evt-far", centroidLat: 41.5, centroidLon: -3.0 }];
     const [match] = matchClustersToEvents([cluster], existing);
     expect(match.matchedEventId).toBeNull();
   });
@@ -45,31 +36,11 @@ describe("matchClustersToEvents", () => {
   it("never claims the same existing event twice", () => {
     const clusterA = fakeCluster({ centroidLat: 40.360, centroidLon: -4.660 });
     const clusterB = fakeCluster({ centroidLat: 40.361, centroidLon: -4.661 });
-    const existing = [
-      { id: "evt-1", centroidLat: 40.3605, centroidLon: -4.6605, pointCount: 3 },
-    ];
+    const existing = [{ id: "evt-1", centroidLat: 40.3605, centroidLon: -4.6605 }];
     const matches = matchClustersToEvents([clusterA, clusterB], existing);
     const claimedIds = matches.map((m) => m.matchedEventId);
     expect(claimedIds.filter((id) => id === "evt-1")).toHaveLength(1);
     expect(claimedIds.filter((id) => id === null)).toHaveLength(1);
-  });
-});
-
-describe("computeLevel", () => {
-  it("returns level 2 when point_count grew since the previous run", () => {
-    const cluster = fakeCluster({ pointCount: 6 });
-    expect(computeLevel(cluster, 4)).toBe(2);
-  });
-
-  it("returns level 1 when point_count is stable or decreasing", () => {
-    const cluster = fakeCluster({ pointCount: 4 });
-    expect(computeLevel(cluster, 10)).toBe(1);
-    expect(computeLevel(cluster, 4)).toBe(1);
-  });
-
-  it("returns level 1 for a brand-new event with no previous run to compare", () => {
-    const cluster = fakeCluster({ pointCount: 4 });
-    expect(computeLevel(cluster, undefined)).toBe(1);
   });
 });
 

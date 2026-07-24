@@ -44,9 +44,12 @@ edita una lista de incendios a mano — si alguien propone eso, es un paso
 atrás en el diseño.
 
 ## Honestidad de datos (aplica a cualquier texto que se muestre al usuario)
-- Los hotspots satelitales tienen retraso de 1-3h y **no son** el nivel
-  oficial de gravedad (IGR) del 112 — todo `level` calculado por el sistema
-  debe etiquetarse como "estimado", nunca como oficial.
+- Los hotspots satelitales tienen retraso de 1-3h y **nunca sustituyen** al
+  aviso oficial del 112.
+- No inventar niveles de gravedad ni tendencias (estable/creciendo) que no
+  se puedan respaldar con datos 100% reales — ver ADR-0002 y ADR-0004. El
+  único estado que se muestra es `active`/`inactive` (¿ha tenido detecciones
+  en las últimas 24h o no?), que sí es verificable.
 - VIIRS/MODIS pueden fallar bajo nubes densas o humo espeso — no prometer
   cobertura total en ningún copy de la interfaz.
 

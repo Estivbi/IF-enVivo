@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 import type { FireEventCollection } from "@/lib/types";
 
-function statusBadge(level: 0 | 1 | 2, timesObserved: number): { label: string; className: string } {
-  if (level === 0) return { label: "Inactivo", className: "bg-gray-700 text-gray-300" };
-  // level is only a real trend once compared across ≥2 cron runs — a
-  // brand-new detection is honestly "new", not "stable" (see ADR-0002).
-  if (timesObserved <= 1) return { label: "Nuevo", className: "bg-blue-900/60 text-blue-200" };
-  if (level === 2) return { label: "En crecimiento", className: "bg-red-900/60 text-red-200" };
-  return { label: "Estable", className: "bg-orange-900/60 text-orange-200" };
+// Deliberately just active/inactive — see ADR-0004. A "stable vs growing"
+// distinction existed before but relied on comparing satellite-detected
+// point counts between cron runs, too noisy a signal to call reliable.
+function statusBadge(status: "active" | "inactive"): { label: string; className: string } {
+  return status === "active"
+    ? { label: "Activo", className: "bg-orange-900/60 text-orange-200" }
+    : { label: "Inactivo", className: "bg-gray-700 text-gray-300" };
 }
 
 // Reference link only — no scraping, no copied content. Lets the user check
@@ -50,7 +50,9 @@ export function Sidebar({
   selectedId: string | null;
   onSelect: (id: string) => void;
 }) {
-  const sorted = [...fires.features].sort((a, b) => b.properties.level - a.properties.level);
+  const sorted = [...fires.features].sort((a, b) =>
+    a.properties.status === b.properties.status ? 0 : a.properties.status === "active" ? -1 : 1,
+  );
 
   return (
     <aside className="flex h-full w-full flex-col overflow-y-auto bg-gray-800 md:w-80 md:shrink-0 md:border-r md:border-gray-700">
@@ -59,9 +61,9 @@ export function Sidebar({
         <LiveClock />
         <p className="mt-2 text-xs text-gray-400">
           Detección automática de incendios a partir de datos satelitales
-          (NASA FIRMS). Los hotspots tienen retraso de 1-3h y el nivel
-          mostrado es <strong className="text-gray-300">estimado</strong>, no
-          el nivel oficial del 112.
+          (NASA FIRMS). Los hotspots tienen retraso de 1-3h — esto{" "}
+          <strong className="text-gray-300">no sustituye</strong> al aviso
+          oficial del 112.
         </p>
       </div>
 
@@ -72,7 +74,7 @@ export function Sidebar({
           </li>
         )}
         {sorted.map((f) => {
-          const badge = statusBadge(f.properties.level, f.properties.timesObserved);
+          const badge = statusBadge(f.properties.status);
           return (
             <li
               key={f.properties.id}

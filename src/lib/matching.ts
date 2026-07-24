@@ -7,7 +7,6 @@ export type ExistingEventRef = {
   id: string;
   centroidLat: number;
   centroidLon: number;
-  pointCount: number;
 };
 
 export type ClusterMatch = {
@@ -50,22 +49,6 @@ export function matchClustersToEvents(
   }
 
   return matches;
-}
-
-/**
- * Heuristic activity level — never the official 112/IGR severity, must
- * always be surfaced to users as "estimated" (see CLAUDE.md honesty-of-data
- * rules). Deliberately based only on the observed point_count trend, not on
- * any invented FRP threshold — actual severity is for the authorities to
- * declare, not for this pipeline to guess at.
- */
-export function computeLevel(
-  cluster: ClusterSummary,
-  previousPointCount: number | undefined,
-): 0 | 1 | 2 {
-  const isGrowing =
-    previousPointCount !== undefined && cluster.pointCount > previousPointCount;
-  return isGrowing ? 2 : 1;
 }
 
 export function isStale(lastDetectedAt: Date, now: Date = new Date()): boolean {

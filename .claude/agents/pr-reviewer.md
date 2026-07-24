@@ -17,8 +17,9 @@ Checklist en cada revisión:
   que sustituya la detección automática?
 - ¿Algún secreto (`FIRMS_MAP_KEY`, `DATABASE_URL`, `CRON_SECRET`) quedó
   expuesto en el diff, en logs, o accesible desde el bundle del cliente?
-- ¿El copy de nivel de gravedad sigue diciendo "estimado" y no da a entender
-  que es el dato oficial del 112?
+- ¿Algún copy o cálculo nuevo inventa un nivel de gravedad o tendencia
+  (estable/creciendo) sin poder respaldarlo con datos 100% reales? (ver
+  ADR-0002 y ADR-0004 — solo `active`/`inactive` está permitido)
 - ¿Build y lint en verde?
 - ¿El código es legible y mantenible por alguien que no seas tú?
 

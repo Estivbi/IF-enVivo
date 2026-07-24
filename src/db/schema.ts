@@ -3,7 +3,6 @@ import {
   uuid,
   text,
   doublePrecision,
-  smallint,
   integer,
   real,
   timestamp,
@@ -20,12 +19,11 @@ export const fireEvents = pgTable(
     province: text("province"),
     centroidLat: doublePrecision("centroid_lat").notNull(),
     centroidLon: doublePrecision("centroid_lon").notNull(),
-    status: text("status").notNull().default("active"), // active | inactive
-    level: smallint("level").notNull().default(0), // 0,1,2 heurístico
-    // How many cron runs have touched this event. level is only a real
-    // trend (stable/growing) once we've compared at least 2 runs — on the
-    // first ever observation it's honestly "new", not "stable".
-    timesObserved: integer("times_observed").notNull().default(1),
+    // active | inactive — the only status distinction we can back with a
+    // 100% real signal (has this had new detections in the last 24h or
+    // not). See ADR-0004: a former "stable vs growing" level was dropped
+    // because point-count trend between cron runs is too noisy a proxy.
+    status: text("status").notNull().default("active"),
     pointCount: integer("point_count").notNull().default(0),
     maxFrp: real("max_frp"),
     sumFrp: real("sum_frp"),

@@ -13,10 +13,9 @@ import type { FireEventCollection, HotspotPointCollection } from "@/lib/types";
 
 const SPAIN_CENTER: [number, number] = [-3.7, 40.2];
 
-const LEVEL_COLOR: Record<number, string> = {
-  0: "#9ca3af", // inactive/gray
-  1: "#f97316", // orange
-  2: "#dc2626", // red
+const STATUS_COLOR: Record<string, string> = {
+  active: "#f97316", // orange
+  inactive: "#9ca3af", // gray
 };
 
 const EMPTY_POINTS: HotspotPointCollection = { type: "FeatureCollection", features: [] };
@@ -134,11 +133,10 @@ export function FiresMap({
           "circle-radius": ["interpolate", ["linear"], ["get", "pointCount"], 3, 6, 30, 18],
           "circle-color": [
             "match",
-            ["get", "level"],
-            0, LEVEL_COLOR[0],
-            1, LEVEL_COLOR[1],
-            2, LEVEL_COLOR[2],
-            LEVEL_COLOR[0],
+            ["get", "status"],
+            "active", STATUS_COLOR.active,
+            "inactive", STATUS_COLOR.inactive,
+            STATUS_COLOR.active,
           ],
           "circle-stroke-width": 2,
           "circle-stroke-color": "#ffffff",
@@ -161,7 +159,7 @@ export function FiresMap({
         popup
           .setLngLat((feature.geometry as GeoJSON.Point).coordinates as [number, number])
           .setHTML(
-            `<strong>${escapeHtml(props.name ?? "Incendio sin nombre")}</strong><br/>${escapeHtml(props.desc ?? "")}<br/><em>Nivel estimado, no oficial</em><br/><a href="${searchUrl}" target="_blank" rel="noopener noreferrer">Buscar información oficial ↗</a>`,
+            `<strong>${escapeHtml(props.name ?? "Incendio sin nombre")}</strong><br/>${escapeHtml(props.desc ?? "")}<br/><em>Detección automática, no sustituye al 112</em><br/><a href="${searchUrl}" target="_blank" rel="noopener noreferrer">Buscar información oficial ↗</a>`,
           )
           .addTo(map);
       });

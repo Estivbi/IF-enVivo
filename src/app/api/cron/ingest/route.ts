@@ -4,12 +4,7 @@ import { db } from "@/db/client";
 import { fireEvents, hotspotPoints } from "@/db/schema";
 import { fetchFirmsHotspots, isLowConfidence } from "@/lib/firms";
 import { clusterHotspots, type ClusterSummary } from "@/lib/clustering";
-import {
-  computeLevel,
-  isStale,
-  matchClustersToEvents,
-  type ExistingEventRef,
-} from "@/lib/matching";
+import { isStale, matchClustersToEvents, type ExistingEventRef } from "@/lib/matching";
 import { isSpain, reverseGeocode } from "@/lib/geocode";
 
 export const dynamic = "force-dynamic";
@@ -20,20 +15,13 @@ function isAuthorized(req: NextRequest): boolean {
   return req.headers.get("authorization") === `Bearer ${secret}`;
 }
 
-async function updateExistingEvent(
-  eventId: string,
-  cluster: ClusterSummary,
-  previousPointCount: number | undefined,
-  previousTimesObserved: number,
-): Promise<void> {
+async function updateExistingEvent(eventId: string, cluster: ClusterSummary): Promise<void> {
   await db
     .update(fireEvents)
     .set({
       centroidLat: cluster.centroidLat,
       centroidLon: cluster.centroidLon,
       status: "active",
-      level: computeLevel(cluster, previousPointCount),
-      timesObserved: previousTimesObserved + 1,
       pointCount: cluster.pointCount,
       maxFrp: cluster.maxFrp,
       sumFrp: cluster.sumFrp,
@@ -70,7 +58,6 @@ async function createEventIfSpain(
       centroidLat: cluster.centroidLat,
       centroidLon: cluster.centroidLon,
       status: "active",
-      level: computeLevel(cluster, undefined),
       pointCount: cluster.pointCount,
       maxFrp: cluster.maxFrp,
       sumFrp: cluster.sumFrp,
@@ -143,9 +130,7 @@ async function runIngest(req: NextRequest) {
       id: fireEvents.id,
       centroidLat: fireEvents.centroidLat,
       centroidLon: fireEvents.centroidLon,
-      pointCount: fireEvents.pointCount,
       lastDetectedAt: fireEvents.lastDetectedAt,
-      timesObserved: fireEvents.timesObserved,
     })
     .from(fireEvents)
     .where(eq(fireEvents.status, "active"));
@@ -154,7 +139,6 @@ async function runIngest(req: NextRequest) {
     id: e.id,
     centroidLat: e.centroidLat,
     centroidLon: e.centroidLon,
-    pointCount: e.pointCount,
   }));
 
   const matches = matchClustersToEvents(clusters, existingRefs);
@@ -167,12 +151,7 @@ async function runIngest(req: NextRequest) {
   for (const match of matches) {
     if (match.matchedEventId) {
       const previous = activeEvents.find((e) => e.id === match.matchedEventId);
-      await updateExistingEvent(
-        match.matchedEventId,
-        match.cluster,
-        previous?.pointCount,
-        previous?.timesObserved ?? 1,
-      );
+      await updateExistingEvent(match.matchedEventId, match.cluster);
       await insertNewPoints(match.matchedEventId, match.cluster, previous?.lastDetectedAt ?? null);
       continue;
     }
@@ -199,7 +178,7 @@ async function runIngest(req: NextRequest) {
     if (!isStale(event.lastDetectedAt)) continue;
     await db
       .update(fireEvents)
-      .set({ status: "inactive", level: 0, updatedAt: new Date() })
+      .set({ status: "inactive", updatedAt: new Date() })
       .where(eq(fireEvents.id, event.id));
     closed++;
   }
