@@ -84,7 +84,7 @@ export default function SobrePage() {
                 <h3 className="mb-1 font-medium text-orange-300">3. Agrupación en eventos</h3>
                 <p className="text-sm">
                   Los hotspots individuales (puntos de satélite) se agrupan por proximidad
-                  geográfica para formar "eventos de incendio". Un evento puede tener docenas
+                  geográfica para formar &ldquo;eventos de incendio&rdquo;. Un evento puede tener docenas
                   de hotspots si el fuego es grande. Esta agrupación es automática y puede
                   cometer errores: incendios muy cercanos pueden aparecer como uno, o uno grande
                   puede verse como varios.
