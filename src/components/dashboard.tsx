@@ -32,8 +32,12 @@ export function Dashboard() {
         setUserLocation([pos.coords.longitude, pos.coords.latitude]);
         setLocating(false);
       },
-      () => {
-        setLocationError("No se ha podido obtener tu ubicación.");
+      (err) => {
+        setLocationError(
+          err.code === err.PERMISSION_DENIED
+            ? "Has denegado el permiso de ubicación. Actívalo en los ajustes del navegador para usar esta función."
+            : "No se ha podido obtener tu ubicación.",
+        );
         setLocating(false);
       },
       { enableHighAccuracy: false, timeout: 10_000 },
