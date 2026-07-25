@@ -182,13 +182,6 @@ export function Sidebar({
             />
             Hotspot individual (satélite VIIRS)
           </div>
-          <div className="flex items-center gap-2 text-xs text-gray-300">
-            <span
-              className="inline-block h-3 w-3 shrink-0 rounded-sm border border-dashed border-red-600 bg-red-600/15"
-              aria-hidden="true"
-            />
-            Superficie estimada (aproximación propia, no un perímetro oficial)
-          </div>
         </div>
       </div>
 

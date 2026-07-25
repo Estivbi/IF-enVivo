@@ -219,30 +219,6 @@ export function FiresMap({
         type: "geojson",
         data: hotspotPointsRef.current as unknown as GeoJSON.FeatureCollection,
       });
-      // Our own estimate (convex hull of the raw detections) — not an
-      // official burned-area perimeter. Copernicus EFFIS would give us the
-      // real thing but its service has been down all day; see ADR-0005.
-      map.addLayer({
-        id: "hotspot-perimeter-fill",
-        type: "fill",
-        source: "hotspot-points",
-        filter: ["==", ["get", "kind"], "estimated_perimeter"],
-        paint: {
-          "fill-color": "#dc2626",
-          "fill-opacity": 0.15,
-        },
-      });
-      map.addLayer({
-        id: "hotspot-perimeter-outline",
-        type: "line",
-        source: "hotspot-points",
-        filter: ["==", ["get", "kind"], "estimated_perimeter"],
-        paint: {
-          "line-color": "#dc2626",
-          "line-width": 1.5,
-          "line-dasharray": [2, 2],
-        },
-      });
       // NASA FIRMS/Worldview-style hotspots: a soft blurred halo (circle-blur)
       // under a bright core, colour scaling yellow → orange → red by
       // radiative power (FRP) the same way the official FIRMS map does —
@@ -290,6 +266,17 @@ export function FiresMap({
         "inactive", STATUS_COLOR.inactive,
         STATUS_COLOR.active,
       ];
+      // Fades out between zoom 7 and 10 — flying into a selected fire (zoom
+      // 10, see the selectedId effect below) should reveal the individual
+      // glowing hotspots underneath instead of staying hidden behind one
+      // big aggregated blob.
+      const FIRE_EVENT_ZOOM_OPACITY: DataDrivenPropertyValueSpecification<number> = [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        7, 1,
+        10, 0,
+      ];
       // Same glow-halo treatment as the raw hotspots, scaled up — makes the
       // aggregated fire markers read as "this place is burning" at a glance,
       // even zoomed out to see the whole country.
@@ -301,7 +288,7 @@ export function FiresMap({
           "circle-radius": ["interpolate", ["linear"], ["get", "pointCount"], 3, 14, 30, 34],
           "circle-blur": 1,
           "circle-color": FIRE_EVENT_COLOR,
-          "circle-opacity": 0.35,
+          "circle-opacity": ["*", 0.35, FIRE_EVENT_ZOOM_OPACITY],
         },
       });
       map.addLayer({
@@ -311,8 +298,10 @@ export function FiresMap({
         paint: {
           "circle-radius": ["interpolate", ["linear"], ["get", "pointCount"], 3, 6, 30, 18],
           "circle-color": FIRE_EVENT_COLOR,
+          "circle-opacity": FIRE_EVENT_ZOOM_OPACITY,
           "circle-stroke-width": 2,
           "circle-stroke-color": "#ffffff",
+          "circle-stroke-opacity": FIRE_EVENT_ZOOM_OPACITY,
         },
       });
 
