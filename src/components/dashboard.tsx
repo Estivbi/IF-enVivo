@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FiresMap } from "./fires-map";
 import { Sidebar } from "./sidebar";
 import { WelcomeModal } from "./welcome-modal";
+import { EmbedCodeButton } from "./embed-code-button";
 import type { FireEventCollection } from "@/lib/types";
 
 const EMPTY: FireEventCollection = { type: "FeatureCollection", features: [] };
@@ -112,12 +113,15 @@ export function Dashboard() {
         />
         {/* Footer con links legales — solo visible en desktop (el sidebar es estático) */}
         <footer className="hidden border-t border-gray-700 px-4 py-3 text-xs text-gray-500 md:block lg:block">
-          <div className="flex gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <a href="/sobre" className="hover:text-gray-300 transition">Sobre FOCOS</a>
             <span aria-hidden>·</span>
             <a href="/aviso-legal" className="hover:text-gray-300 transition">Aviso legal</a>
             <span aria-hidden>·</span>
             <a href="https://github.com/Estivbi/IF-enVivo" target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 transition">GitHub</a>
+          </div>
+          <div className="mt-2">
+            <EmbedCodeButton label="Insertar mapa en tu web ↗" />
           </div>
         </footer>
 

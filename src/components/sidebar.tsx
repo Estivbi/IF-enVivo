@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { FireEventCollection } from "@/lib/types";
 import { distanceKm, formatDistance } from "@/lib/geo";
+import { EmbedCodeButton } from "./embed-code-button";
 
 // Deliberately just active/inactive — see ADR-0004. A "stable vs growing"
 // distinction existed before but relied on comparing satellite-detected
@@ -242,20 +243,23 @@ export function Sidebar({
                     </p>
                   )}
                 </button>
-                <a
-                  href={officialInfoSearchUrl(
-                    f.properties.name,
-                    f.properties.municipality,
-                    f.properties.province,
-                  )}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  aria-label={`Buscar información oficial sobre ${f.properties.name ?? "este incendio"} (abre en nueva pestaña)`}
-                  className="mb-3 ml-4 mt-1 inline-block text-xs text-orange-300 hover:text-orange-200 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500"
-                >
-                  Buscar información oficial ↗
-                </a>
+                <div className="mb-3 ml-4 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <a
+                    href={officialInfoSearchUrl(
+                      f.properties.name,
+                      f.properties.municipality,
+                      f.properties.province,
+                    )}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label={`Buscar información oficial sobre ${f.properties.name ?? "este incendio"} (abre en nueva pestaña)`}
+                    className="text-xs text-orange-300 hover:text-orange-200 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500"
+                  >
+                    Buscar información oficial ↗
+                  </a>
+                  <EmbedCodeButton fireId={f.properties.id} label="Insertar en tu web ↗" />
+                </div>
               </li>
             );
           })}
