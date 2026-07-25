@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { FireEventCollection } from "@/lib/types";
+import { distanceKm, formatDistance } from "@/lib/geo";
+import { EmbedCodeButton } from "./embed-code-button";
 
 // Deliberately just active/inactive — see ADR-0004. A "stable vs growing"
 // distinction existed before but relied on comparing satellite-detected
@@ -91,15 +93,29 @@ export function Sidebar({
   selectedId,
   onSelect,
   loading,
+  userLocation,
+  onLocate,
+  locating,
+  locationError,
 }: {
   fires: FireEventCollection;
   selectedId: string | null;
   onSelect: (id: string) => void;
   loading?: boolean;
+  userLocation?: [number, number] | null;
+  onLocate?: () => void;
+  locating?: boolean;
+  locationError?: string | null;
 }) {
-  const sorted = [...fires.features].sort((a, b) =>
-    a.properties.status === b.properties.status ? 0 : a.properties.status === "active" ? -1 : 1,
-  );
+  const sorted = userLocation
+    ? [...fires.features].sort(
+        (a, b) =>
+          distanceKm(userLocation, a.geometry.coordinates) -
+          distanceKm(userLocation, b.geometry.coordinates),
+      )
+    : [...fires.features].sort((a, b) =>
+        a.properties.status === b.properties.status ? 0 : a.properties.status === "active" ? -1 : 1,
+      );
 
   return (
     <aside
@@ -124,6 +140,18 @@ export function Sidebar({
           <strong>1–3 h</strong> respecto al tiempo real.{" "}
           <strong className="text-orange-300">No sustituye al 112.</strong>
         </p>
+        <button
+          onClick={onLocate}
+          disabled={locating}
+          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded border border-orange-500 bg-orange-600/20 px-3 py-1.5 text-xs font-medium text-orange-200 transition hover:bg-orange-600/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-300 disabled:opacity-60"
+        >
+          {locating ? "Buscando tu ubicación…" : userLocation ? "Actualizar mi ubicación" : "📍 Incendios cerca de mí"}
+        </button>
+        {locationError && (
+          <p role="alert" className="mt-1.5 text-xs text-red-300">
+            {locationError}
+          </p>
+        )}
       </header>
 
       {/* Leyenda de puntos del mapa */}
@@ -154,13 +182,6 @@ export function Sidebar({
             />
             Hotspot individual (satélite VIIRS)
           </div>
-          <div className="flex items-center gap-2 text-xs text-gray-300">
-            <span
-              className="inline-block h-3 w-3 shrink-0 rounded-sm border border-dashed border-red-600 bg-red-600/15"
-              aria-hidden="true"
-            />
-            Superficie estimada (aproximación propia, no un perímetro oficial)
-          </div>
         </div>
       </div>
 
@@ -180,6 +201,9 @@ export function Sidebar({
             const badge = statusBadge(f.properties.status);
             const lastDetected = formatLastDetected(f.properties.lastDetectedAt);
             const isSelected = selectedId === f.properties.id;
+            const distance = userLocation
+              ? formatDistance(distanceKm(userLocation, f.geometry.coordinates))
+              : null;
             return (
               <li
                 key={f.properties.id}
@@ -188,7 +212,7 @@ export function Sidebar({
                 <button
                   onClick={() => onSelect(f.properties.id)}
                   aria-pressed={isSelected}
-                  aria-label={`${f.properties.name ?? "Incendio sin nombre"}, estado: ${badge.label}${lastDetected ? `, última detección: ${lastDetected}` : ""}`}
+                  aria-label={`${f.properties.name ?? "Incendio sin nombre"}, estado: ${badge.label}${distance ? `, ${distance}` : ""}${lastDetected ? `, última detección: ${lastDetected}` : ""}`}
                   className="w-full px-4 pt-3 text-left transition hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500"
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -202,27 +226,33 @@ export function Sidebar({
                       {badge.label}
                     </span>
                   </div>
-                  <p className="mt-1 text-xs text-gray-300">{f.properties.desc}</p>
+                  <p className="mt-1 text-xs text-gray-300">
+                    {f.properties.desc}
+                    {distance && <span className="text-orange-300"> · {distance}</span>}
+                  </p>
                   {lastDetected && (
                     <p className="mt-0.5 text-xs text-gray-500">
                       Última detección: {lastDetected}
                     </p>
                   )}
                 </button>
-                <a
-                  href={officialInfoSearchUrl(
-                    f.properties.name,
-                    f.properties.municipality,
-                    f.properties.province,
-                  )}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  aria-label={`Buscar información oficial sobre ${f.properties.name ?? "este incendio"} (abre en nueva pestaña)`}
-                  className="mb-3 ml-4 mt-1 inline-block text-xs text-orange-300 hover:text-orange-200 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500"
-                >
-                  Buscar información oficial ↗
-                </a>
+                <div className="mb-3 ml-4 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <a
+                    href={officialInfoSearchUrl(
+                      f.properties.name,
+                      f.properties.municipality,
+                      f.properties.province,
+                    )}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label={`Buscar información oficial sobre ${f.properties.name ?? "este incendio"} (abre en nueva pestaña)`}
+                    className="text-xs text-orange-300 hover:text-orange-200 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500"
+                  >
+                    Buscar información oficial ↗
+                  </a>
+                  <EmbedCodeButton fireId={f.properties.id} label="Insertar en tu web ↗" />
+                </div>
               </li>
             );
           })}

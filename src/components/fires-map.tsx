@@ -9,6 +9,7 @@ import {
   type MapGeoJSONFeature,
   type StyleSpecification,
 } from "maplibre-gl";
+import type { DataDrivenPropertyValueSpecification } from "@maplibre/maplibre-gl-style-spec";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { FireEventCollection, HotspotPointCollection } from "@/lib/types";
 
@@ -109,10 +110,16 @@ export function FiresMap({
   fires,
   selectedId,
   onSelect,
+  userLocation,
+  embed,
 }: {
   fires: FireEventCollection;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  userLocation?: [number, number] | null;
+  // Rendered inside a media outlet's <iframe> (see /embed) — hides the
+  // basemap/overlay controls so the widget stays a clean, minimal map.
+  embed?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -129,6 +136,8 @@ export function FiresMap({
   // sources after a basemap switch always uses the latest data.
   const firesRef = useRef(fires);
   firesRef.current = fires;
+  const userLocationRef = useRef(userLocation);
+  userLocationRef.current = userLocation;
   const hotspotPointsRef = useRef<HotspotPointCollection>(EMPTY_POINTS);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
@@ -210,28 +219,28 @@ export function FiresMap({
         type: "geojson",
         data: hotspotPointsRef.current as unknown as GeoJSON.FeatureCollection,
       });
-      // Our own estimate (convex hull of the raw detections) — not an
-      // official burned-area perimeter. Copernicus EFFIS would give us the
-      // real thing but its service has been down all day; see ADR-0005.
+      // NASA FIRMS/Worldview-style hotspots: a soft blurred halo (circle-blur)
+      // under a bright core, colour scaling yellow → orange → red by
+      // radiative power (FRP) the same way the official FIRMS map does —
+      // low-energy detections read as embers, high-FRP ones as hot fire.
+      const FRP_COLOR_SCALE: DataDrivenPropertyValueSpecification<string> = [
+        "interpolate",
+        ["linear"],
+        ["coalesce", ["get", "frp"], 5],
+        0, "#fde047",
+        15, "#f97316",
+        60, "#dc2626",
+      ];
       map.addLayer({
-        id: "hotspot-perimeter-fill",
-        type: "fill",
+        id: "hotspot-points-glow",
+        type: "circle",
         source: "hotspot-points",
-        filter: ["==", ["get", "kind"], "estimated_perimeter"],
+        filter: ["==", ["get", "kind"], "hotspot"],
         paint: {
-          "fill-color": "#dc2626",
-          "fill-opacity": 0.15,
-        },
-      });
-      map.addLayer({
-        id: "hotspot-perimeter-outline",
-        type: "line",
-        source: "hotspot-points",
-        filter: ["==", ["get", "kind"], "estimated_perimeter"],
-        paint: {
-          "line-color": "#dc2626",
-          "line-width": 1.5,
-          "line-dasharray": [2, 2],
+          "circle-radius": 9,
+          "circle-blur": 1,
+          "circle-color": FRP_COLOR_SCALE,
+          "circle-opacity": 0.55,
         },
       });
       map.addLayer({
@@ -240,9 +249,9 @@ export function FiresMap({
         source: "hotspot-points",
         filter: ["==", ["get", "kind"], "hotspot"],
         paint: {
-          "circle-radius": 4,
-          "circle-color": "#dc2626",
-          "circle-opacity": 0.5,
+          "circle-radius": 3,
+          "circle-color": FRP_COLOR_SCALE,
+          "circle-opacity": 0.9,
         },
       });
 
@@ -250,19 +259,78 @@ export function FiresMap({
         type: "geojson",
         data: firesRef.current as unknown as GeoJSON.FeatureCollection,
       });
+      const FIRE_EVENT_COLOR: DataDrivenPropertyValueSpecification<string> = [
+        "match",
+        ["get", "status"],
+        "active", STATUS_COLOR.active,
+        "inactive", STATUS_COLOR.inactive,
+        STATUS_COLOR.active,
+      ];
+      // Fades out between zoom 7 and 10 — flying into a selected fire (zoom
+      // 10, see the selectedId effect below) should reveal the individual
+      // glowing hotspots underneath instead of staying hidden behind one
+      // big aggregated blob.
+      const FIRE_EVENT_ZOOM_OPACITY: DataDrivenPropertyValueSpecification<number> = [
+        "interpolate",
+        ["linear"],
+        ["zoom"],
+        7, 1,
+        10, 0,
+      ];
+      // Same glow-halo treatment as the raw hotspots, scaled up — makes the
+      // aggregated fire markers read as "this place is burning" at a glance,
+      // even zoomed out to see the whole country.
+      map.addLayer({
+        id: "fire-events-glow",
+        type: "circle",
+        source: "fire-events",
+        paint: {
+          "circle-radius": ["interpolate", ["linear"], ["get", "pointCount"], 3, 14, 30, 34],
+          "circle-blur": 1,
+          "circle-color": FIRE_EVENT_COLOR,
+          "circle-opacity": ["*", 0.35, FIRE_EVENT_ZOOM_OPACITY],
+        },
+      });
       map.addLayer({
         id: "fire-events-circles",
         type: "circle",
         source: "fire-events",
         paint: {
           "circle-radius": ["interpolate", ["linear"], ["get", "pointCount"], 3, 6, 30, 18],
-          "circle-color": [
-            "match",
-            ["get", "status"],
-            "active", STATUS_COLOR.active,
-            "inactive", STATUS_COLOR.inactive,
-            STATUS_COLOR.active,
-          ],
+          "circle-color": FIRE_EVENT_COLOR,
+          "circle-opacity": FIRE_EVENT_ZOOM_OPACITY,
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-opacity": FIRE_EVENT_ZOOM_OPACITY,
+        },
+      });
+
+      // Punto "tú estás aquí" — solo se rellena cuando el usuario pulsa
+      // "Incendios cerca de mí"; source vacía hasta entonces.
+      map.addSource("user-location", {
+        type: "geojson",
+        data: userLocationRef.current
+          ? {
+              type: "FeatureCollection",
+              features: [
+                { type: "Feature", geometry: { type: "Point", coordinates: userLocationRef.current }, properties: {} },
+              ],
+            }
+          : { type: "FeatureCollection", features: [] },
+      });
+      map.addLayer({
+        id: "user-location-halo",
+        type: "circle",
+        source: "user-location",
+        paint: { "circle-radius": 10, "circle-color": "#3b82f6", "circle-opacity": 0.25 },
+      });
+      map.addLayer({
+        id: "user-location-dot",
+        type: "circle",
+        source: "user-location",
+        paint: {
+          "circle-radius": 5,
+          "circle-color": "#3b82f6",
           "circle-stroke-width": 2,
           "circle-stroke-color": "#ffffff",
         },
@@ -326,6 +394,17 @@ export function FiresMap({
 
   useEffect(() => {
     const map = mapRef.current;
+    if (!map || !userLocation) return;
+    const source = map.getSource("user-location") as GeoJSONSource | undefined;
+    source?.setData({
+      type: "FeatureCollection",
+      features: [{ type: "Feature", geometry: { type: "Point", coordinates: userLocation }, properties: {} }],
+    });
+    map.flyTo({ center: userLocation, zoom: 9 });
+  }, [userLocation]);
+
+  useEffect(() => {
+    const map = mapRef.current;
     if (!map || !selectedId) return;
     const feature = fires.features.find((f) => f.properties.id === selectedId);
     if (!feature) return;
@@ -380,7 +459,9 @@ export function FiresMap({
            Móvil: esquina superior derecha (top-2 right-2) para no solapar
            ni con el hamburguesa (top-2 left-2) ni con la barra del navegador.
            Desktop: abajo a la izquierda, igual que antes.
+           Ocultos en /embed — un widget para medios va limpio, sin toggles.
           ──────────────────────────────────────────────────────────────── */}
+      {!embed && (
       <div className="absolute right-2 top-2 z-10 flex flex-col items-end gap-1 sm:bottom-6 sm:left-2 sm:right-auto sm:top-auto sm:items-start">
 
         {/* Toggle basemap: Calle / Satélite */}
@@ -433,6 +514,7 @@ export function FiresMap({
           })}
         </div>
       </div>
+      )}
     </div>
   );
 }
