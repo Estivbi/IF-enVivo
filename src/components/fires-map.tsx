@@ -109,10 +109,12 @@ export function FiresMap({
   fires,
   selectedId,
   onSelect,
+  userLocation,
 }: {
   fires: FireEventCollection;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  userLocation?: [number, number] | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -129,6 +131,8 @@ export function FiresMap({
   // sources after a basemap switch always uses the latest data.
   const firesRef = useRef(fires);
   firesRef.current = fires;
+  const userLocationRef = useRef(userLocation);
+  userLocationRef.current = userLocation;
   const hotspotPointsRef = useRef<HotspotPointCollection>(EMPTY_POINTS);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
@@ -268,6 +272,37 @@ export function FiresMap({
         },
       });
 
+      // Punto "tú estás aquí" — solo se rellena cuando el usuario pulsa
+      // "Incendios cerca de mí"; source vacía hasta entonces.
+      map.addSource("user-location", {
+        type: "geojson",
+        data: userLocationRef.current
+          ? {
+              type: "FeatureCollection",
+              features: [
+                { type: "Feature", geometry: { type: "Point", coordinates: userLocationRef.current }, properties: {} },
+              ],
+            }
+          : { type: "FeatureCollection", features: [] },
+      });
+      map.addLayer({
+        id: "user-location-halo",
+        type: "circle",
+        source: "user-location",
+        paint: { "circle-radius": 10, "circle-color": "#3b82f6", "circle-opacity": 0.25 },
+      });
+      map.addLayer({
+        id: "user-location-dot",
+        type: "circle",
+        source: "user-location",
+        paint: {
+          "circle-radius": 5,
+          "circle-color": "#3b82f6",
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#ffffff",
+        },
+      });
+
       // Popup reutilizable — se abre en mouseenter (escritorio) y en click
       // (táctil/teclado) para que sea accesible en todos los dispositivos.
       const popup = new Popup({ closeButton: true, offset: 12, className: "fire-popup" });
@@ -323,6 +358,17 @@ export function FiresMap({
     const source = map.getSource("fire-events") as GeoJSONSource | undefined;
     source?.setData(fires as unknown as GeoJSON.FeatureCollection);
   }, [fires]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !userLocation) return;
+    const source = map.getSource("user-location") as GeoJSONSource | undefined;
+    source?.setData({
+      type: "FeatureCollection",
+      features: [{ type: "Feature", geometry: { type: "Point", coordinates: userLocation }, properties: {} }],
+    });
+    map.flyTo({ center: userLocation, zoom: 9 });
+  }, [userLocation]);
 
   useEffect(() => {
     const map = mapRef.current;
